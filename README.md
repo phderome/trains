@@ -1,6 +1,9 @@
 To build:
+
 Use sbt 1.2.6
+
 $ sbt run
+
 $ sbt test
  
 To have a more pleasant test experience, build from Intellij IDEA and run tests.

@@ -5,6 +5,7 @@ import org.scalacheck.Gen.choose
 import org.specs2.ScalaCheck
 import org.scalacheck.Prop.forAll
 import org.specs2.mutable.Specification
+import org.specs2.scalacheck.Parameters
 import scalax.collection.Graph
 import scalax.collection.GraphPredef._
 import scalax.collection.edge.Implicits._
@@ -21,6 +22,7 @@ object routeservicespec extends Specification with ScalaCheck {
   // Shut down the business.
   // The restrictions serve a purpose to make test design simpler without sacrificing completeness.
 
+  implicit val params = Parameters(minTestsOk = 200)
   // Scalacheck usage specific note: varying the data in generators too much
   // make ScalaCheck think it does not have enough valid tests and gives up
   // so we keep graphs small with few distinct nodes and few varying weights
@@ -61,81 +63,64 @@ object routeservicespec extends Specification with ScalaCheck {
         .map(k =>
           service.findWalksExact(root, k).length)
         .sum
-      allPathsTally ==== exactTally
+      allPathsTally == exactTally
     }
 
     "findWalksMaxHops do not stop more than promised" ! forAll(genEdgeList) {
       edges =>
         val graph = Graph.from(Nil, edges)
-        val root = graph.nodes.head
         val stopsLimit = 2
         val service = new RouteService(graph)
         val walkStops =
-          service.findWalksMaxHops(root, stopsLimit).map(_.length - 1)
-        walkStops.foreach { stops =>
-          stops must be <= stopsLimit
+          service.findWalksMaxHops(graph.nodes.head, stopsLimit).map(_.length - 1)
+        walkStops.forall { stops =>
+          stops <= stopsLimit
         }
-
-        true must beTrue
     }
 
     "findWalksExact do not stop more or less than promised" ! forAll(
       genEdgeList) { edges =>
       val graph = Graph.from(Nil, edges)
-      val root = graph.nodes.head
-
       val stopsLimit = 2
       val service = new RouteService(graph)
       val walkStops =
-        service.findWalksExact(root, stopsLimit).map(_.length - 1)
-      walkStops.foreach { stops =>
-        stops ==== stopsLimit
+        service.findWalksExact(graph.nodes.head, stopsLimit).map(_.length - 1)
+      walkStops.forall { stops =>
+        stops == stopsLimit
       }
-
-      true must beTrue
     }
 
     "findWalksExact computes a walk in the graph that library recognizes as such" ! forAll(
       genEdgeList) { edges =>
       val graph = Graph.from(Nil, edges)
-      val root = graph.nodes.head
-
       val stopsLimit = 2
       val service = new RouteService(graph)
-      val walks = service.findWalksExact(root, stopsLimit)
-      walks.foreach { walk =>
+      val walks = service.findWalksExact(graph.nodes.head, stopsLimit)
+      walks.forall { walk =>
         val nodePairs = walk zip walk.tail
-        nodePairs.foreach {
+        nodePairs.forall {
           case (s, t) =>
             service.n(s).diSuccessors must contain(service.n(t))
         }
       }
-
-      true must beTrue
     }
 
     "exploreWalksWithinDistance does not retain paths above the allowed limit" ! forAll(
       genEdgeList) { edges =>
       val graph = Graph.from(Nil, edges)
-      val root = graph.nodes.head
-
       val limitDistance = 2
       val service = new RouteService(graph)
       val walkDistances = service
-        .exploreWalksWithinDistance(root, limitDistance)
+        .exploreWalksWithinDistance(graph.nodes.head, limitDistance)
         .flatMap(service.getDistance)
-      walkDistances.foreach { w =>
-        w must be_<=(limitDistance)
-      }
-
-      true must beTrue
+      walkDistances.forall { _ <= limitDistance }
     }
 
     // a walk that consists of weight x should always be eligible for a limit of its own amount of x + 1 (since comparison is strict)
     "exploreWalksWithinDistance allows a single weight to be within its limit" ! forAll(
       genEdgeList) { edges =>
       val graph = Graph.from(Nil, edges)
-      graph.edges.foreach { e =>
+      graph.edges.forall { e =>
         val service = new RouteService(graph)
         val nodeSequences: Seq[service.NodeSeq] =
           service.exploreWalksWithinDistance(e.from.toOuter,
@@ -144,54 +129,42 @@ object routeservicespec extends Specification with ScalaCheck {
           (ns zip ns.tail).exists {
             case (s, t) => s == e.from.toOuter && t == e.to.toOuter
           }
-        } must beTrue
+        }
       }
-
-      true must beTrue
     }
 
     "getDistance when walk is cyclic, all nodes on cycle have same or less distance to themselves" ! forAll(
       genEdgeList) { edges =>
       val graph = Graph.from(Nil, edges)
-      val cycle = graph.findCycle
-      cycle.foreach { c =>
+      graph.findCycle.forall { c =>
         val charNodes = c.nodes.map(_.toOuter).toList
         val service = new RouteService(graph)
         val bruteForceDistance = c.edges.map(_.weight.toInt).sum
-        charNodes.foreach { node =>
-          service.shortestSame(node).foreach { d2 =>
-            d2 must be <= bruteForceDistance
-          }
+        charNodes.forall { node =>
+          service.shortestSame(node).forall { _ <= bruteForceDistance }
         }
       }
-      true must beTrue
     }
 
     "getDistance evaluates the same using brute force" ! forAll(genEdgeList) {
       edges =>
         val graph = Graph.from(Nil, edges)
-        val cycle = graph.findCycle
-        cycle.foreach { c =>
-          val charNodes = c.nodes.map(_.toOuter).toList
+        graph.findCycle.forall { c =>
           val service = new RouteService(graph)
-          val ourDistance = service.getDistance(charNodes)
+          val charNodes = c.nodes.map(_.toOuter).toList
           val bruteForceDistance = c.edges.map(_.weight.toInt).sum
-          ourDistance must beSome(bruteForceDistance)
+          service.getDistance(charNodes) must beSome(bruteForceDistance)
         }
-        true must beTrue
     }
 
     "getDistance evaluates to number of edges in a graph of weight 1" ! forAll(
       genUniformEdgeList) { edges =>
       val graph = Graph.from(Nil, edges)
-      val cycle = graph.findCycle
-      cycle.foreach { c =>
-        val charNodes = c.nodes.map(_.toOuter).toList
+      graph.findCycle.forall { c =>
         val service = new RouteService(graph)
-        val ourDistance = service.getDistance(charNodes)
-        ourDistance must beSome(c.edges.size)
+        val charNodes = c.nodes.map(_.toOuter).toList
+        service.getDistance(charNodes) must beSome(c.edges.size)
       }
-      true must beTrue
     }
 
     ("shortestSame is defined iff start node is in a cycle "
@@ -202,14 +175,12 @@ object routeservicespec extends Specification with ScalaCheck {
 
       val service = new RouteService(graph)
       if (service.shortestSame(root).isDefined)
-        root.findCycle.isDefined must beTrue
+        root.findCycle.isDefined
       // findCycle may choose a cycle that does not end with h. We could learn the API better to identify
       // a cycle that is not simply reachable from h but also contains it.
-      else {
-        root.findCycle.foreach(cycle => cycle.endNode == root must beFalse) // it may find a cycle further down but will not end here at h
-      }
+      else
+        root.findCycle.forall(cycle => cycle.endNode != root) // it may find a cycle further down but will not end here at h
 
-      true must beTrue
     }
 
   }

@@ -44,10 +44,9 @@ final class RouteService(val routes: Graph[Char, WDiEdge]) {
     if (walk.lengthCompare(2) < 0) None
     else {
       val walkBuilder = routes.newWalkBuilder(n(walk.head))(walk.length)
-      walk.tail.foreach { x =>
-        if (!(walkBuilder add n(x))) return None
-      }
-      Some(walkBuilder.result.weight.toInt)
+      if (walk.tail.forall { x => walkBuilder add n(x) })
+        Some(walkBuilder.result.weight.toInt)
+      else None
     }
   }
 
@@ -69,21 +68,21 @@ final class RouteService(val routes: Graph[Char, WDiEdge]) {
     predicate => path => path.lengthCompare(1) > 0 && predicate(path)
 
   def findWalksMaxHops(u: Char, limit: Int, p: NodeSeq => Boolean = _ => true): List[NodeSeq] = {
-    val walks = ListBuffer(Vector(u))
-    var currGenWalks = walks.clone().toList
-    (1 to limit).foreach { _ =>
-      val nextGenWalks =
-        for {
-          walk <- currGenWalks
-          next <- n(walk.last).diSuccessors
-        } yield walk :+ next.toOuter
-      walks.appendAll(nextGenWalks)
-      currGenWalks = nextGenWalks
-    }
-    walks.toList.filter(combinePredWithNonZeroLength(p))
+    val (totalWalks, _) =
+      (1 to limit).foldLeft((List(Vector(u)), List(Vector(u)))) { case ((walks, currGenWalks), _) =>
+        val nextGenWalks =
+          for {
+            walk <- currGenWalks
+            next <- n(walk.last).diSuccessors
+          } yield walk :+ next.toOuter
+        (walks ++ nextGenWalks, nextGenWalks)
+      }
+    totalWalks.filter(combinePredWithNonZeroLength(p))
   }
 
   def exploreWalksWithinDistance(u: Char, limit: Int, predicate: NodeSeq => Boolean = _ => true): Seq[NodeSeq] = {
+    // this is BFS algorithm and interestingly the library supports it natively but seems to refuse to walk through cycles
+    // for a while as is required here.
     val allWalks = ListBuffer(Vector(u))
     var eligibleWalks: Seq[NodeSeq] = List(Vector(u))
     while (eligibleWalks.nonEmpty) {

@@ -51,17 +51,18 @@ final class RouteService(val routes: Graph[Char, WDiEdge]) {
   }
 
   def findWalksExact(u: Char, limit: Int, p: NodeSeq => Boolean = _ => true): List[NodeSeq] = {
-    def go(u: Char, limit: Int): List[NodeSeq] = {
-      if (limit == 0) List(Vector(u))
-      else
+    def explore(u: Char, limit: Int): List[NodeSeq] = {
+      (1 to limit).foldLeft(List(Vector(u))) { case (eligibleWalks, _) =>
         for {
-          successor <- n(u).diSuccessors.toList
-          path <- go(successor.toOuter, limit - 1)
-        } yield u +: path // extend the walks we found by placing u in front
+          walk <- eligibleWalks
+          successor <- n(walk.last).diSuccessors.toList
+          newWalk = walk :+ successor.toOuter
+        } yield newWalk
+      }
     }
 
     if (limit == 0) Nil // need to suppress walks of length 0
-    else go(u, limit).filter(p)
+    else explore(u, limit).filter(p)
   }
 
   lazy val combinePredWithNonZeroLength: (NodeSeq => Boolean) => NodeSeq => Boolean =

@@ -6,6 +6,7 @@ import scalax.collection.edge.Implicits._
 import scalax.collection.edge.WDiEdge
 
 object Trains extends App {
+
   def outputTest(n: Int, result: String): Unit =
     println(s"Output #$n: $result")
 
@@ -21,8 +22,12 @@ object Trains extends App {
       val edges = for {
         tok <- tokens
         m <- Pattern.findFirstMatchIn(tok)
-        if m.group(1).head != m.group(2).head
-      } yield m.group(1).head ~> m.group(2).head % m.group(3).toInt
+        a = m.group(1).head
+        b = m.group(2).head
+        if a != b
+        weight = m.group(3).toInt
+      } yield a ~> b % weight
+
       // extract AB123 to A, B, 123 and create a directed edge out of them
       if (edges.nonEmpty && edges.lengthCompare(tokens.length) == 0)
         Some(Graph.from(Nil, edges))

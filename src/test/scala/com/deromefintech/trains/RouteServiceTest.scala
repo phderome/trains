@@ -100,7 +100,7 @@ object routeservicespec extends Specification with ScalaCheck {
         val nodePairs = walk zip walk.tail
         nodePairs.forall {
           case (s, t) =>
-            service.n(s).diSuccessors must contain(service.n(t))
+            service.node(s).diSuccessors must contain(service.node(t))
         }
       }
     }

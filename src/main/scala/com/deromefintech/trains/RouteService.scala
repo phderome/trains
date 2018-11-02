@@ -84,11 +84,7 @@ final class RouteService(val routes: Graph[Char, WDiEdge]) {
   val combinePredWithNonZeroLength: (NodeSeq => Boolean) => NodeSeq => Boolean =
     predicate => path => path.lengthCompare(1) > 0 && predicate(path)
 
-  def findWalksMaxHops(
-      u: Char,
-      limit: Int,
-      p: NodeSeq => Boolean = _ => true
-  ): List[NodeSeq] = {
+  def findWalksMaxHops(u: Char, limit: Int, p: NodeSeq => Boolean = _ => true): List[NodeSeq] = {
     val (totalWalks, _) =
       (1 to limit).foldLeft((List(NodeSeq(u)), List(NodeSeq(u)))) {
         case ((walks, currGenWalks), _) =>

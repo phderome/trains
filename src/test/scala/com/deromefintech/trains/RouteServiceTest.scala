@@ -4,7 +4,6 @@ import org.scalacheck.Gen
 import org.scalacheck.Gen.choose
 import org.specs2.ScalaCheck
 import org.scalacheck.Prop.forAll
-import org.specs2.matcher.MatchResult
 import org.specs2.mutable.Specification
 import org.specs2.scalacheck.Parameters
 import scalax.collection.Graph

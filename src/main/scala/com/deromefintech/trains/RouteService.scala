@@ -29,31 +29,40 @@ final class RouteService(val routes: Graph[Char, WDiEdge]) {
 
     def findOutgoingTo(mNode1: Option[routes.NodeT]): Option[routes.EdgeT] =
       (mNode0, mNode1).mapN(_ findOutgoingTo _).flatten
+
+    def getOneHopDistance(mNode1: Option[routes.NodeT]): Option[Int] =
+      findOutgoingTo(mNode1).map(_.weight.toInt)
+
+    def shortestDistinct(mNode1: Option[routes.NodeT]): Option[Int] =
+      shortestPathTo(mNode1).map(_.weight.toInt)
+
+    def shortestSame: Option[Int] = {
+      // requirements do not accept a value of 0 here and insist on doing a non-trivial cycle
+      val lengths =
+        for {
+          next <- diSuccessors.map(node(_))
+          length <- (next.shortestDistinct(mNode0), getOneHopDistance(next)).mapN(_ + _)
+        } yield length
+      if (lengths.isEmpty) None else Some(lengths.min)
+    }
   }
 
   def node(outer: Char): Option[routes.NodeT] = routes find outer
 
   val selectLast: Char => NodeSeq => Boolean = t => ns => ns.last == t
 
-  def shortestDistinct(x: Char, y: Char): Option[Int] =
-    node(x).shortestPathTo(node(y)).map(_.weight.toInt)
+  def shortestDistinct(s: Char, t: Char): Option[Int] =
+    node(s).shortestDistinct(node(t))
 
-  def shortestSame(x: Char): Option[Int] = {
-    // requirements do not accept a value of 0 here and insist on doing a non-trivial cycle
-    val lengths =
-      for {
-        succ <- node(x).diSuccessors
-        length <- (shortestDistinct(succ, x), getOneHopDistance(x, succ)).mapN(_ + _)
-      } yield length
-    if (lengths.isEmpty) None else Some(lengths.min)
-  }
+  def shortestSame(s: Char): Option[Int] =
+    node(s).shortestSame
 
   def shortestRoute(s: Char, t: Char): Option[Int] =
     if (s == t) shortestSame(s)
     else shortestDistinct(s, t)
 
   def getOneHopDistance(s: Char, t: Char): Option[Int] =
-    (node(s) findOutgoingTo node(t)).map(_.weight.toInt)
+    node(s).getOneHopDistance(node(t))
 
   // all we are doing is using the Graph API to construct a valid walk if input is valid and ask API to give us back the weight.
   def getDistance(walk: Seq[Char]): Option[Int] = {

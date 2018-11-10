@@ -4,6 +4,7 @@ import org.scalacheck.Gen
 import org.scalacheck.Gen.choose
 import org.specs2.ScalaCheck
 import org.scalacheck.Prop.forAll
+import org.specs2.matcher.MatchResult
 import org.specs2.mutable.Specification
 import org.specs2.scalacheck.Parameters
 import scalax.collection.Graph
@@ -100,7 +101,11 @@ object routeservicespec extends Specification with ScalaCheck {
         val nodePairs = walk zip walk.tail
         nodePairs.forall {
           case (s, t) =>
-            service.n(s).diSuccessors must contain(service.n(t))
+            val eval = for {
+              sNode <- service.node(s)
+              tNode <- service.node(t)
+            } yield sNode.diSuccessors.contains(tNode)
+            eval.contains(true)
         }
       }
     }
@@ -113,7 +118,9 @@ object routeservicespec extends Specification with ScalaCheck {
       val walkDistances = service
         .exploreWalksWithinDistance(graph.nodes.head, limitDistance)
         .flatMap(service.getDistance)
-      walkDistances.forall { _ <= limitDistance }
+      walkDistances.forall {
+        _ <= limitDistance
+      }
     }
 
     // a walk that consists of weight x should always be eligible for a limit of its own amount of x + 1 (since comparison is strict)
@@ -141,7 +148,9 @@ object routeservicespec extends Specification with ScalaCheck {
         val service = new RouteService(graph)
         val bruteForceDistance = c.edges.map(_.weight.toInt).sum
         charNodes.forall { node =>
-          service.shortestSame(node).forall { _ <= bruteForceDistance }
+          service.shortestSame(node).forall {
+            _ <= bruteForceDistance
+          }
         }
       }
     }

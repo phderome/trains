@@ -16,8 +16,30 @@ final class RouteService(val routes: Graph[Char, WDiEdge]) {
     @inline def apply(c: Char): NodeSeq = Vector(c)
   }
 
+  def interpret(q: Query): (Query, String) =
+    q match {
+      case Distance(walk) =>
+        (q, getDistance(walk).show)
+
+      case WalksMaxHopsSelectLast(s, t, limit) =>
+        (q, findWalksMaxHopsSelectLast(s, t, limit).show)
+
+      case WalksExactSelectLast(s, t, limit) =>
+        (q, findWalksExactSelectLast(s, t, limit).show)
+
+      case ShortestRoute(s, t) =>
+        (q, shortestRoute(s, t).show)
+
+      case WalksWithinDistanceSelectLast(s, t, limit) =>
+        (q, exploreWalksWithinDistanceSelectLast(s, t, limit).show)
+    }
+
   implicit class ShowOptionalDistance(opt: Option[Int]) {
     def show: String = opt.map(_.toString).getOrElse("NO SUCH ROUTE")
+  }
+
+  implicit class ShowWalk(nodes: Seq[NodeSeq]) {
+    def show: String = nodes.length.toString
   }
 
   implicit class RichOptionNodeT(mNode0: Option[routes.NodeT]) {

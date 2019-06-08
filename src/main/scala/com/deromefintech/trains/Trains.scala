@@ -7,9 +7,6 @@ import scalax.collection.edge.WDiEdge
 
 object Trains extends App {
 
-  def outputTest(n: Int, result: String): Unit =
-    println(s"Output #$n: $result")
-
   def parseInput(line: String): Option[Graph[Char, WDiEdge]] = {
     val tokens = line
       .replace("Graph: ", "")
@@ -39,55 +36,51 @@ object Trains extends App {
     import service._ // makes all public methods available
 
     /*
-     1. The distance of the route A-B-C.
-     2. The distance of the route A-D.
-     3. The distance of the route A-D-C.
-     4. The distance of the route A-E-B-C-D.
-     5. The distance of the route A-E-D.
-     */
-    var testCase = 0
-    List("ABC", "AD", "ADC", "AEBCD", "AED").foreach { s =>
-      testCase = testCase + 1
-      outputTest(testCase, getDistance(s.toList).show)
+    The distance of the route A-B-C.
+    The distance of the route A-D.
+    The distance of the route A-D-C.
+    The distance of the route A-E-B-C-D.
+    The distance of the route A-E-D.
+    */
+    val distanceQueries = List("ABC", "AD", "ADC", "AEBCD", "AED").map(Distance(_))
+
+    /*
+      The number of trips starting at C and ending at C with a maximum of 3
+      stops.  In the sample data, there are two such trips: C-D-C (2
+      stops). and C-E-B-C (3 stops).
+    */
+    val maxHopsSelectLastQueries = WalksMaxHopsSelectLast(s = 'C', t = 'C', limit = 3) :: Nil
+
+    /*
+      The number of trips starting at A and ending at C with exactly 4 stops.
+        In the sample data, there are three such trips: A to C (via B,C,D); A
+        to C (via D,C,D); and A to C (via D,E,B).
+    */
+    val exactSelectLastQueries = WalksExactSelectLast(s = 'A', t = 'C', limit = 4) :: Nil
+
+    /*
+      The length of the shortestRoute route (in terms of distance to travel) from A
+      to C and then B to B
+    */
+    val shortestRouteQueries = List(ShortestRoute(s = 'A', t = 'C'), ShortestRoute(s = 'B', t = 'B'))
+
+    /*
+      The number of different routes from C to C with a distance of less than
+      30.  In the sample data, the trips are: CDC, CEBC, CEBCDC, CDCEBC, CDEBC,
+      CEBCEBC, CEBCEBCEBC. So 7 of them.
+    */
+    val withinDistanceSelectLastQueries = WalksWithinDistanceSelectLast(s = 'C', t = 'C', limit = 30) :: Nil
+
+    val queries: List[Query] = distanceQueries ++
+      maxHopsSelectLastQueries ++
+      exactSelectLastQueries ++
+      shortestRouteQueries ++
+      withinDistanceSelectLastQueries
+
+    val interpretedQueries: List[(Query, String)] = queries map interpret
+    interpretedQueries.foreach { case (q, result) =>
+      println(s"${q.show}: $result")
     }
-
-    /*
-    6. The number of trips starting at C and ending at C with a maximum of 3
-    stops.  In the sample data below, there are two such trips: C-D-C (2
-    stops). and C-E-B-C (3 stops).
-     */
-    testCase = testCase + 1
-    outputTest(testCase, findWalksMaxHopsSelectLast(s = 'C', t = 'C', limit = 3).length.toString)
-
-    /*
-    7. The number of trips starting at A and ending at C with exactly 4 stops.
-      In the sample data below, there are three such trips: A to C (via B,C,D); A
-    to C (via D,C,D); and A to C (via D,E,B).
-     */
-    testCase = testCase + 1
-    outputTest(testCase, findWalksExactSelectLast(s = 'A', t = 'C', limit = 4).length.toString)
-
-    /*
-    8. The length of the shortestRoute route (in terms of distance to travel) from A
-    to C.
-     */
-    testCase = testCase + 1
-    outputTest(testCase, shortestRoute(s = 'A', t = 'C').show)
-
-    /*
-    9. The length of the shortestRoute route (in terms of distance to travel) from B
-    to B.
-     */
-    testCase = testCase + 1
-    outputTest(testCase, shortestRoute(s = 'B', t = 'B').show)
-
-    /*
-    10. The number of different routes from C to C with a distance of less than
-    30.  In the sample data, the trips are: CDC, CEBC, CEBCDC, CDCEBC, CDEBC,
-    CEBCEBC, CEBCEBCEBC. So 7 of them.
-     */
-    testCase = testCase + 1
-    outputTest(testCase, exploreWalksWithinDistanceSelectLast('C', 'C', 30).length.toString)
   }
 
   println("enter graph for example Graph: AB5, BC4, CD8, DC8, DE6, AD5, CE2, EB3, AE7")

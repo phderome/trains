@@ -1,6 +1,10 @@
 package com.deromefintech.trains
 
 import com.deromefintech.trains.TrainService.{NetworkRequest, RawWeightedEdge}
+import akka.actor._
+
+import scala.concurrent.Await
+import scala.concurrent.duration._
 
 object Trains extends App {
 
@@ -25,14 +29,17 @@ object Trains extends App {
     }
   }
 
-  val trainActor = new TrainActor()
+  val system = ActorSystem("Trains")
+  val trainActor = system.actorOf(Props[TrainActor], name = "trainactor")
 
-  while(true) {
+  (1 to 2).foreach { _ =>
     println("enter graph for example Graph: AB5, BC4, CD8, DC8, DE6, AD5, CE2, EB3, AE7")
     val line = scala.io.StdIn.readLine()
-    trainActor.create(getNetworkRequest(line))
-    getSampleQueries.foreach(trainActor.query)
+    trainActor ! getNetworkRequest(line)
+    getSampleQueries.foreach(q => trainActor ! q)
   }
+  Thread.sleep(7000)
+  Await.ready(system.terminate(), 20.seconds)
 
   def getSampleQueries: List[Query] = {
     /*

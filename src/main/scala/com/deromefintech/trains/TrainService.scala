@@ -1,5 +1,6 @@
 package com.deromefintech.trains
 
+import akka.actor.Actor
 import scalax.collection.Graph
 import scalax.collection.edge.WDiEdge
 
@@ -173,19 +174,26 @@ final case class TrainService(val routes: Graph[Char, WDiEdge]) {
 
 }
 
-class TrainActor() {
+class TrainActor() extends Actor {
   import TrainService._
+
+  override def receive: Receive = {
+    case r: NetworkRequest  =>
+      create(r)
+    case q: Query  =>
+      query(q)
+  }
 
   var service: Option[TrainService] = None
 
-  def query(q: Query): Unit = service match {
+  private def query(q: Query): Unit = service match {
     case None => println(s"non-existing train network, cannot execute query ${q.show}")
     case Some(s) =>
       val result = s.interpret(q)
       println(s"${q.show}: $result")
   }
 
-  def create(request: NetworkRequest): Unit = {
+  private def create(request: NetworkRequest): Unit = {
     import scalax.collection.GraphPredef._
     import scalax.collection.edge.Implicits._
 

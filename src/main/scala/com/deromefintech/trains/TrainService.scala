@@ -65,15 +65,17 @@ final case class TrainService(val routes: Graph[Char, WDiEdge])  {
   def getDistance(walk: Seq[Char]): Option[Int] = {
     if (walk.lengthCompare(2) < 0) None
     else {
-      val walkBuilder = node(walk.head).map(n => routes.newWalkBuilder(n)(walk.length))
+      val walkBuilder = node(walk.head).map(h => routes.newWalkBuilder(h)(walk.length))
       for {
         wBuilder <- walkBuilder
         dist <- if (walk.drop(1).forall { x =>
           (for {
             n <- node(x)
           } yield wBuilder.add(n)).nonEmpty
-        })
-          Some(wBuilder.result.weight.toInt)
+        }) {
+          val walkFromNext = wBuilder.result
+          if (walkFromNext.length + 1 == walk.length) Some(walkFromNext.weight.toInt) else None
+        }
         else None
       } yield dist
     }

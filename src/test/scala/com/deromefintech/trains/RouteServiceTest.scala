@@ -128,7 +128,7 @@ object routeservicespec extends Specification with ScalaCheck {
       val graph = Graph.from(Nil, edges)
       graph.edges.forall { e =>
         val service = new TrainService(graph)
-        val nodeSequences: Seq[service.NodeSeq] =
+        val nodeSequences =
           service.exploreWalksWithinDistance(e.from.toOuter,
             e.weight.toInt + 1)
         nodeSequences.exists { ns =>

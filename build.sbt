@@ -14,6 +14,7 @@ libraryDependencies ++= Seq(
   "org.scala-graph"   %% "graph-core"        % graphCoreVersion,
   "org.typelevel"     %% "cats-core"         % catsVersion,
   "com.typesafe.akka" %% "akka-actor"        % akkaVersion,
+  "com.typesafe.akka" %% "akka-persistence-typed"  % akkaVersion,
   "org.scalacheck"    %% "scalacheck"        % scalaCheckVersion % "test",
   "org.specs2"        %% "specs2-core"       % specs2Version     % "test",
   "org.specs2"        %% "specs2-scalacheck" % specs2Version     % "test"

@@ -5,6 +5,7 @@ import TrainActor._
 class TrainActor() extends FSM[State, Data] {
   import TrainService._
   import Messages._
+
   startWith(Offline, Uninitialized)
 
   when(Offline) {

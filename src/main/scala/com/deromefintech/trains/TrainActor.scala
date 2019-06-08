@@ -143,7 +143,8 @@ object TrainActor {
       def show: String = s"WalksWithinDistanceSelectLast($s, $t, $limit)"
     }
 
-    final case class NetworkCreateCommand(edgeCount: Int, weightedEdges: List[RawWeightedEdge])
+    sealed trait Command
+    final case class NetworkCreateCommand(edgeCount: Int, weightedEdges: List[RawWeightedEdge]) extends Command
   }
 
   import Messages._

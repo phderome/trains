@@ -10,12 +10,7 @@ import cats.implicits._
 import scala.collection.mutable.ListBuffer
 
 final case class TrainService(val routes: Graph[Char, WDiEdge])  {
-
-  type NodeSeq = Vector[Char]
-
-  object NodeSeq {
-    @inline def apply(c: Char): NodeSeq = Vector(c)
-  }
+  import TrainService._
 
   implicit class RichOptionNodeT(mNode0: Option[routes.NodeT]) {
     def shortestPathTo(mNode1: Option[routes.NodeT]): Option[routes.Path] =
@@ -147,6 +142,19 @@ final case class TrainService(val routes: Graph[Char, WDiEdge])  {
 final case class RawWeightedEdge(s: Char, t: Char, w: Int)
 
 object TrainService {
+  type NodeSeq = Vector[Char]
+
+  object NodeSeq {
+    @inline def apply(c: Char): NodeSeq = Vector(c)
+  }
+
+  implicit class ShowOptionalDistance(opt: Option[Int]) {
+    def show: String = opt.map(_.toString).getOrElse("NO SUCH ROUTE")
+  }
+  implicit class ShowWalk(nodes: List[TrainService.NodeSeq]) {
+    def show: String = nodes.length.toString
+  }
+
   def createRoutes(edgeCount: Int, weightedEdges: List[RawWeightedEdge]): Option[Graph[Char, WDiEdge]] = {
     val edges: List[WDiEdge[Char]] = weightedEdges.map { case RawWeightedEdge(a, b, w) => a ~> b % w }
 

@@ -3,6 +3,7 @@ package com.deromefintech.trains
 import akka.actor.{FSM, Props}
 import TrainActor._
 class TrainActor() extends FSM[State, Data] {
+  import TrainService._
   import Messages._
   startWith(Offline, Uninitialized)
 
@@ -41,15 +42,7 @@ class TrainActor() extends FSM[State, Data] {
 
   initialize()
 
-  implicit class ShowOptionalDistance(opt: Option[Int]) {
-    def show: String = opt.map(_.toString).getOrElse("NO SUCH ROUTE")
-  }
-
-  def handleQuery(service: TrainService, q: Query): String= {
-    implicit class ShowWalk(nodes: List[service.NodeSeq]) {
-      def show: String = nodes.length.toString
-    }
-
+  def handleQuery(service: TrainService, q: Query): String=
     q match {
       case Distance(walk) =>
         service.getDistance(walk).show
@@ -66,7 +59,6 @@ class TrainActor() extends FSM[State, Data] {
       case WalksWithinDistanceSelectLast(s, t, limit) =>
         service.exploreWalksWithinDistanceSelectLast(s, t, limit).show
     }
-  }
 
   def rejectQuery(q: Query): FSM.State[TrainActor.State, Data] = {
     val reject = RejectedQuery(q, s"cannot satisfy query ${q.show} as train network is offline")

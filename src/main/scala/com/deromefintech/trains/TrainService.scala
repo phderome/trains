@@ -1,33 +1,20 @@
 package com.deromefintech.trains
 
-import akka.actor.Actor
 import scalax.collection.Graph
 import scalax.collection.edge.WDiEdge
+import scalax.collection.GraphPredef._
+import scalax.collection.edge.Implicits._
 
-import scala.collection.mutable.ListBuffer
 import cats.implicits._
 
-import scala.language.postfixOps
+import scala.collection.mutable.ListBuffer
 
-object TrainService {
-  final case class RawWeightedEdge(s: Char, t: Char, w: Int)
-  final case class NetworkRequest(edgeCount: Int, weightedEdges: List[RawWeightedEdge])
-}
-
-final case class TrainService(val routes: Graph[Char, WDiEdge]) {
+final case class TrainService(val routes: Graph[Char, WDiEdge])  {
 
   type NodeSeq = Vector[Char]
 
   object NodeSeq {
     @inline def apply(c: Char): NodeSeq = Vector(c)
-  }
-
-  implicit class ShowOptionalDistance(opt: Option[Int]) {
-    def show: String = opt.map(_.toString).getOrElse("NO SUCH ROUTE")
-  }
-
-  implicit class ShowWalk(nodes: List[NodeSeq]) {
-    def show: String = nodes.length.toString
   }
 
   implicit class RichOptionNodeT(mNode0: Option[routes.NodeT]) {
@@ -153,59 +140,18 @@ final case class TrainService(val routes: Graph[Char, WDiEdge]) {
 
   def exploreWalksWithinDistanceSelectLast(s: Char, t: Char, limit: Int): List[NodeSeq] =
     exploreWalksWithinDistance(s, limit, selectLast(t))
-
-  def interpret(q: Query): String=
-    q match {
-      case Distance(walk) =>
-        getDistance(walk).show
-
-      case WalksMaxHopsSelectLast(s, t, limit) =>
-        findWalksMaxHopsSelectLast(s, t, limit).show
-
-      case WalksExactSelectLast(s, t, limit) =>
-        findWalksExactSelectLast(s, t, limit).show
-
-      case ShortestRoute(s, t) =>
-        shortestRoute(s, t).show
-
-      case WalksWithinDistanceSelectLast(s, t, limit) =>
-        exploreWalksWithinDistanceSelectLast(s, t, limit).show
-    }
-
 }
 
-class TrainActor() extends Actor {
-  import TrainService._
+final case class RawWeightedEdge(s: Char, t: Char, w: Int)
 
-  override def receive: Receive = {
-    case r: NetworkRequest  =>
-      create(r)
-    case q: Query  =>
-      query(q)
-  }
-
-  var service: Option[TrainService] = None
-
-  private def query(q: Query): Unit = service match {
-    case None => println(s"non-existing train network, cannot execute query ${q.show}")
-    case Some(s) =>
-      val result = s.interpret(q)
-      println(s"${q.show}: $result")
-  }
-
-  private def create(request: NetworkRequest): Unit = {
-    import scalax.collection.GraphPredef._
-    import scalax.collection.edge.Implicits._
-
-    val edges: List[WDiEdge[Char]] = request.weightedEdges.map { case RawWeightedEdge(a, b, w) => a~> b % w }
+object TrainService {
+  def createRoutes(edgeCount: Int, weightedEdges: List[RawWeightedEdge]): Option[Graph[Char, WDiEdge]] = {
+    val edges: List[WDiEdge[Char]] = weightedEdges.map { case RawWeightedEdge(a, b, w) => a ~> b % w }
 
     // extract AB123 to A, B, 123 and create a directed edge out of them
-    val graph: Option[Graph[Char, WDiEdge]] =
-      if (edges.nonEmpty && edges.lengthCompare(request.edgeCount) == 0)
+      if (edges.nonEmpty && edges.lengthCompare(edgeCount) == 0)
         Some(Graph.from(Nil, edges))
       else None
-
-    service = graph.map(TrainService(_))
-    if (graph.isEmpty) println(s"invalid request $request")
   }
+
 }

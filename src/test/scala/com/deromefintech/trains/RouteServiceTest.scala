@@ -49,13 +49,13 @@ object routeservicespec extends Specification with ScalaCheck {
   val genUniformEdgeList =
     Gen.listOfN(6, uniformEdgeGen)
 
-  "routeservice must" >> {
+  "trainservice must" >> {
     "Number of findWalksMaxHops is equal to the sum of findWalksExact for all values at or below its limit" ! forAll(
       genEdgeList) { edges =>
       val graph = Graph.from(Nil, edges)
       val root = graph.nodes.head
       val stopsLimit = 6
-      val service = new RouteService(graph)
+      val service = new TrainService(graph)
       val allPathsTally = service
         .findWalksMaxHops(root, stopsLimit)
         .length
@@ -70,7 +70,7 @@ object routeservicespec extends Specification with ScalaCheck {
       edges =>
         val graph = Graph.from(Nil, edges)
         val stopsLimit = 2
-        val service = new RouteService(graph)
+        val service = new TrainService(graph)
         val walkStops =
           service.findWalksMaxHops(graph.nodes.head, stopsLimit).map(_.length - 1)
         walkStops.forall { stops =>
@@ -82,7 +82,7 @@ object routeservicespec extends Specification with ScalaCheck {
       genEdgeList) { edges =>
       val graph = Graph.from(Nil, edges)
       val stopsLimit = 2
-      val service = new RouteService(graph)
+      val service = new TrainService(graph)
       val walkStops =
         service.findWalksExact(graph.nodes.head, stopsLimit).map(_.length - 1)
       walkStops.forall { stops =>
@@ -94,7 +94,7 @@ object routeservicespec extends Specification with ScalaCheck {
       genEdgeList) { edges =>
       val graph = Graph.from(Nil, edges)
       val stopsLimit = 2
-      val service = new RouteService(graph)
+      val service = new TrainService(graph)
       val walks = service.findWalksExact(graph.nodes.head, stopsLimit)
       walks.forall { walk =>
         val nodePairs = walk zip walk.tail
@@ -113,7 +113,7 @@ object routeservicespec extends Specification with ScalaCheck {
       genEdgeList) { edges =>
       val graph = Graph.from(Nil, edges)
       val limitDistance = 2
-      val service = new RouteService(graph)
+      val service = new TrainService(graph)
       val walkDistances = service
         .exploreWalksWithinDistance(graph.nodes.head, limitDistance)
         .flatMap(service.getDistance)
@@ -127,7 +127,7 @@ object routeservicespec extends Specification with ScalaCheck {
       genEdgeList) { edges =>
       val graph = Graph.from(Nil, edges)
       graph.edges.forall { e =>
-        val service = new RouteService(graph)
+        val service = new TrainService(graph)
         val nodeSequences: Seq[service.NodeSeq] =
           service.exploreWalksWithinDistance(e.from.toOuter,
             e.weight.toInt + 1)
@@ -144,7 +144,7 @@ object routeservicespec extends Specification with ScalaCheck {
       val graph = Graph.from(Nil, edges)
       graph.findCycle.forall { c =>
         val charNodes = c.nodes.map(_.toOuter).toList
-        val service = new RouteService(graph)
+        val service = new TrainService(graph)
         val bruteForceDistance = c.edges.map(_.weight.toInt).sum
         charNodes.forall { node =>
           service.shortestSame(node).forall {
@@ -158,7 +158,7 @@ object routeservicespec extends Specification with ScalaCheck {
       edges =>
         val graph = Graph.from(Nil, edges)
         graph.findCycle.forall { c =>
-          val service = new RouteService(graph)
+          val service = new TrainService(graph)
           val charNodes = c.nodes.map(_.toOuter).toList
           val bruteForceDistance = c.edges.map(_.weight.toInt).sum
           service.getDistance(charNodes) must beSome(bruteForceDistance)
@@ -169,7 +169,7 @@ object routeservicespec extends Specification with ScalaCheck {
       genUniformEdgeList) { edges =>
       val graph = Graph.from(Nil, edges)
       graph.findCycle.forall { c =>
-        val service = new RouteService(graph)
+        val service = new TrainService(graph)
         val charNodes = c.nodes.map(_.toOuter).toList
         service.getDistance(charNodes) must beSome(c.edges.size)
       }
@@ -181,7 +181,7 @@ object routeservicespec extends Specification with ScalaCheck {
       val graph = Graph.from(Nil, edges)
       val root = graph.nodes.head
 
-      val service = new RouteService(graph)
+      val service = new TrainService(graph)
       if (service.shortestSame(root).isDefined)
         root.findCycle.isDefined
       // findCycle may choose a cycle that does not end with h. We could learn the API better to identify

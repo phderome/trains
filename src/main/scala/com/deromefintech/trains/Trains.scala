@@ -1,46 +1,46 @@
 package com.deromefintech.trains
 
-import scalax.collection.mutable.Graph
-import scalax.collection.GraphPredef._
-import scalax.collection.edge.Implicits._
-import scalax.collection.edge.WDiEdge
+import com.deromefintech.trains.TrainService.{NetworkRequest, RawWeightedEdge}
 
 object Trains extends App {
 
-  def parseInput(line: String): Option[Graph[Char, WDiEdge]] = {
+  def getNetworkRequest(line: String): NetworkRequest = {
     val tokens = line
-      .replace("Graph: ", "")
       .split(", ")
       .toList
-    if (tokens.exists(_.length < 3)) None
+    if (tokens.exists(_.length < 3)) NetworkRequest(0, List.empty[RawWeightedEdge])
     else {
       val Pattern = "([a-zA-Z])([a-zA-Z])(\\d+)".r // to extract AB123 into A-B-123
       // edges will not accept nodes going to themselves, if tokens contain some our line is invalid
-      val edges = for {
+      val edges: List[(Char, Char, Int)] = for {
         tok <- tokens
         m <- Pattern.findFirstMatchIn(tok)
         a = m.group(1).head
         b = m.group(2).head
         if a != b
         weight = m.group(3).toInt
-      } yield a ~> b % weight
-
-      // extract AB123 to A, B, 123 and create a directed edge out of them
-      if (edges.nonEmpty && edges.lengthCompare(tokens.length) == 0)
-        Some(Graph.from(Nil, edges))
-      else None
+      } yield (a, b, weight)
+      val wEdges = edges.map { case(s, t, w) => RawWeightedEdge(s, t, w) }
+      NetworkRequest(tokens.length, wEdges)
     }
   }
 
-  def run(service: RouteService): Unit = {
-    import service._ // makes all public methods available
+  val trainActor = new TrainActor()
 
+  while(true) {
+    println("enter graph for example Graph: AB5, BC4, CD8, DC8, DE6, AD5, CE2, EB3, AE7")
+    val line = scala.io.StdIn.readLine()
+    trainActor.create(getNetworkRequest(line))
+    getSampleQueries.foreach(trainActor.query)
+  }
+
+  def getSampleQueries: List[Query] = {
     /*
-    The distance of the route A-B-C.
-    The distance of the route A-D.
-    The distance of the route A-D-C.
-    The distance of the route A-E-B-C-D.
-    The distance of the route A-E-D.
+     The distance of the route A-B-C.
+     The distance of the route A-D.
+     The distance of the route A-D-C.
+     The distance of the route A-E-B-C-D.
+     The distance of the route A-E-D.
     */
     val distanceQueries = List("ABC", "AD", "ADC", "AEBCD", "AED").map(Distance(_))
 
@@ -71,23 +71,10 @@ object Trains extends App {
     */
     val withinDistanceSelectLastQueries = WalksWithinDistanceSelectLast(s = 'C', t = 'C', limit = 30) :: Nil
 
-    val queries: List[Query] = distanceQueries ++
+    distanceQueries ++
       maxHopsSelectLastQueries ++
       exactSelectLastQueries ++
       shortestRouteQueries ++
       withinDistanceSelectLastQueries
-
-    val interpretedQueries: List[(Query, String)] = queries map interpret
-    interpretedQueries.foreach { case (q, result) =>
-      println(s"${q.show}: $result")
-    }
-  }
-
-  println("enter graph for example Graph: AB5, BC4, CD8, DC8, DE6, AD5, CE2, EB3, AE7")
-  val input = scala.io.StdIn.readLine()
-  parseInput(input) match {
-    case None => println("invalid input")
-    case Some(routes) =>
-      run(new RouteService(routes))
   }
 }

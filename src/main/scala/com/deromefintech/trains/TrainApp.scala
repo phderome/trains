@@ -1,12 +1,12 @@
 package com.deromefintech.trains
 
 import akka.actor._
-import com.deromefintech.trains.domain.model.NetworkCreate
+import com.deromefintech.trains.domain.model.{NetworkCreate, UpdateEdge}
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
 
-object Trains extends App {
+object TrainApp extends App {
 
   def getNetworkCreateCommand(line: String): NetworkCreate = {
     val tokens = line
@@ -24,7 +24,7 @@ object Trains extends App {
         if a != b
         weight = m.group(3).toInt
       } yield (a, b, weight)
-      val wEdges = edges.map { case(s, t, w) => RawWeightedEdge(s, t, w) }
+      val wEdges = edges.map { case(s, t, w) => RawWeightedEdge(RawEdge(s, t), w) }
       NetworkCreate(tokens.length, wEdges)
     }
   }
@@ -32,10 +32,14 @@ object Trains extends App {
   val system = ActorSystem("Trains")
   val trainActor = system.actorOf(Props[TrainActor], TrainActor.Name)
 
-  (1 to 2).foreach { _ =>
+  (1 to 2).foreach { step =>
     println("enter graph for example Graph: AB5, BC4, CD8, DC8, DE6, AD5, CE2, EB3, AE7")
     val line = scala.io.StdIn.readLine()
     trainActor ! getNetworkCreateCommand(line)
+    if (step == 2) {
+      // testing graph editing
+      trainActor ! UpdateEdge(RawWeightedEdge(RawEdge('A', 'E'), 17), formerWeight=7)
+    }
     Thread.sleep(3000) // so that the (new effective) network is available for queries to function as we don't consume feedback messages
     TrainActor.getSampleQueries.foreach(q => trainActor ! q)
   }

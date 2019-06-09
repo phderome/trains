@@ -9,7 +9,7 @@ import cats.implicits._
 
 import scala.collection.mutable.ListBuffer
 
-final case class TrainService(val routes: Graph[Char, WDiEdge])  {
+final case class TrainService(routes: Graph[Char, WDiEdge])  {
   import TrainService._
 
   implicit class RichOptionNodeT(mNode0: Option[routes.NodeT]) {
@@ -137,9 +137,30 @@ final case class TrainService(val routes: Graph[Char, WDiEdge])  {
 
   def exploreWalksWithinDistanceSelectLast(s: Char, t: Char, limit: Int): List[NodeSeq] =
     exploreWalksWithinDistance(s, limit, selectLast(t))
+
+  def updateEdge(weightedEdge: RawWeightedEdge, old: Int): Option[TrainService] = {
+    for {
+      _ <- routes.find(weightedEdge.edge.s)
+      _ <- routes.find(weightedEdge.edge.t)
+    } yield {
+      val newRoutes = (routes - weightedEdge.copy(w = old)) + weightedEdge
+      TrainService(newRoutes)
+    }
+  }
+
+  def deleteEdge(weightedEdge: RawWeightedEdge): Option[TrainService] = {
+    routes
+      .find(weightedEdge)
+      .map { toDelete => TrainService(routes - toDelete) }
+  }
 }
 
-final case class RawWeightedEdge(s: Char, t: Char, w: Int)
+final case class RawEdge(s: Char, t: Char)
+final case class RawWeightedEdge(edge: RawEdge, w: Int)
+object RawWeightedEdge {
+  implicit def toWDiEdge(e: RawWeightedEdge): WDiEdge[Char] =
+    e.edge.s ~> e.edge.t % e.w
+}
 
 object TrainService {
   type NodeSeq = Vector[Char]
@@ -156,7 +177,7 @@ object TrainService {
   }
 
   def createRoutes(edgeCount: Int, weightedEdges: List[RawWeightedEdge]): Option[Graph[Char, WDiEdge]] = {
-    val edges: List[WDiEdge[Char]] = weightedEdges.map { case RawWeightedEdge(a, b, w) => a ~> b % w }
+    val edges: List[WDiEdge[Char]] = weightedEdges.map { case RawWeightedEdge(RawEdge(a, b), w) => a ~> b % w }
 
     // extract AB123 to A, B, 123 and create a directed edge out of them
       if (edges.nonEmpty && edges.lengthCompare(edgeCount) == 0)

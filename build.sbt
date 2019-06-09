@@ -1,4 +1,4 @@
-name := "Trains"
+name := "TrainApp"
 
 version := "0.1"
 

@@ -12,6 +12,20 @@ class TrainActor() extends FSM[State, Data] {
     case Event(NetworkCreate(edgeCount, weightedEdges), _) ⇒
       handleNetworkCreate(edgeCount, weightedEdges)
 
+    case Event(DeleteEdge(edge), _) ⇒
+      val command = DeleteEdge(edge)
+      val reject = RejectedCommand(command, s"invalid command $command as train network is offline")
+      sender() ! reject
+      log.warning(reject.toString)
+      stay()
+
+    case Event(UpdateEdge(weightedEdge, old), _) ⇒
+      val command = UpdateEdge(weightedEdge, old)
+      val reject = RejectedCommand(command, s"invalid command $command as train network is offline")
+      sender() ! reject
+      log.warning(reject.toString)
+      stay()
+
     case Event(q: Query, _) ⇒
       rejectQuery(q)
   }
@@ -24,6 +38,38 @@ class TrainActor() extends FSM[State, Data] {
   when(Active) {
     case Event(NetworkCreate(edgeCount, weightedEdges), _) ⇒
       handleNetworkCreate(edgeCount, weightedEdges)
+
+    case Event(DeleteEdge(e), TrainGraph(service)) ⇒
+      service.deleteEdge(e) match {
+        case None =>
+          val cmd = DeleteEdge(e)
+          val reject = RejectedCommand(cmd, s"invalid command $cmd")
+          sender() ! reject
+          log.warning(reject.toString)
+          stay()
+        case Some(newService) =>
+          val deleted = EdgeDeleted(e)
+          val msg = s"train network deleted edge $deleted"
+          sender() ! deleted
+          log.info(msg)
+          stay() using TrainGraph(newService)
+      }
+
+    case Event(UpdateEdge(weightedEdge, old), TrainGraph(service)) ⇒
+      service.updateEdge(weightedEdge, old) match {
+        case None =>
+          val cmd = UpdateEdge(weightedEdge, old)
+          val reject = RejectedCommand(cmd, s"invalid command $cmd")
+          sender() ! reject
+          log.warning(reject.toString)
+          stay()
+        case Some(newService) =>
+          val updated = EdgeUpdated(weightedEdge)
+          val msg = s"train network updated edge $updated"
+          sender() ! updated
+          log.info(msg)
+          stay() using TrainGraph(newService)
+      }
 
     case Event(q: Query, TrainGraph(service)) ⇒
       val result = handleQuery(service, q)

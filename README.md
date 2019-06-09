@@ -20,7 +20,7 @@ MacBook-Pro-3:trains philippederome$ sbt run
 
 ... skipped
 
-[info] Running com.deromefintech.trains.Trains 
+[info] Running com.deromefintech.trains.TrainApp 
 
 enter graph for example Graph: AB5, BC4, CD8, DC8, DE6, AD5, CE2, EB3, AE7
 

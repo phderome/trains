@@ -1,94 +1,97 @@
 package com.deromefintech.trains
 
-import akka.actor.{FSM, Props}
+import akka.actor.{Actor, ActorLogging, ActorRef, Props}
 import TrainActor._
 import com.deromefintech.trains.domain.model._
-class TrainActor() extends FSM[State, Data] {
+class TrainActor() extends Actor with ActorLogging {
   import TrainService._
 
-  startWith(Offline, Uninitialized)
+  var trainGraph: Option[TrainGraph] = None
 
-  when(Offline) {
-    case Event(NetworkCreate(edgeCount, weightedEdges), _) ⇒
-      handleNetworkCreate(edgeCount, weightedEdges)
+  def receive: Receive = create
 
-    case Event(DeleteEdge(edge), _) ⇒
-      val command = DeleteEdge(edge)
-      val reject = RejectedCommand(command, s"invalid command $command as train network is offline")
-      sender() ! reject
-      log.warning(reject.toString)
-      stay()
-
-    case Event(UpdateEdge(weightedEdge, old), _) ⇒
-      val command = UpdateEdge(weightedEdge, old)
-      val reject = RejectedCommand(command, s"invalid command $command as train network is offline")
-      sender() ! reject
-      log.warning(reject.toString)
-      stay()
-
-    case Event(q: Query, _) ⇒
-      rejectQuery(q)
-  }
-
-  onTransition {
-    case Active -> Offline ⇒ () // nothing to do
-    case Offline -> Active ⇒ () // nothing to do
-  }
-
-  when(Active) {
-    case Event(NetworkCreate(edgeCount, weightedEdges), _) ⇒
-      handleNetworkCreate(edgeCount, weightedEdges)
-
-    case Event(DeleteEdge(e), TrainGraph(service)) ⇒
-      service.deleteEdge(e) match {
-        case None =>
-          val cmd = DeleteEdge(e)
-          val reject = RejectedCommand(cmd, s"invalid command $cmd")
-          sender() ! reject
-          log.warning(reject.toString)
-          stay()
-        case Some(newService) =>
-          val deleted = EdgeDeleted(e)
-          val msg = s"train network deleted edge $deleted"
-          sender() ! deleted
-          log.info(msg)
-          stay() using TrainGraph(newService)
+  def create: Receive = {
+    case NetworkCreate(edgeCount, weightedEdges) ⇒
+      handleNetworkCreate(edgeCount, weightedEdges).foreach { g =>
+        trainGraph = Some(g)
+        context.become(created)
       }
 
-    case Event(UpdateEdge(weightedEdge, old), TrainGraph(service)) ⇒
-      service.updateEdge(weightedEdge, old) match {
-        case None =>
-          val cmd = UpdateEdge(weightedEdge, old)
-          val reject = RejectedCommand(cmd, s"invalid command $cmd")
-          sender() ! reject
-          log.warning(reject.toString)
-          stay()
-        case Some(newService) =>
-          val updated = EdgeUpdated(weightedEdge)
-          val msg = s"train network updated edge $updated"
-          sender() ! updated
-          log.info(msg)
-          stay() using TrainGraph(newService)
+    case DeleteEdge(edge) ⇒
+      rejectOffline(sender(), DeleteEdge(edge))
+
+    case UpdateEdge(weightedEdge, old) ⇒
+      rejectOffline(sender(), UpdateEdge(weightedEdge, old))
+
+    case q: Query ⇒ rejectQuery(q)
+  }
+
+  private def rejectOffline(ref: ActorRef, c: Command): Unit = {
+    val reject = RejectedCommand(c, s"invalid command $c as train network is offline")
+    sender() ! reject
+    log.warning(reject.toString)
+  }
+
+  private def rejectOnline(ref: ActorRef, c: Command): Unit = {
+    val reject = RejectedCommand(c, s"invalid command $c")
+    sender() ! reject
+    log.warning(reject.toString)
+  }
+
+  def created: Receive = {
+    case NetworkCreate(edgeCount, weightedEdges) ⇒
+      handleNetworkCreate(edgeCount, weightedEdges).foreach { g =>
+        trainGraph = Some(g)
+      } // on failure, we simply keep former graph, once created, always created.
+
+    case DeleteEdge(e) ⇒
+      trainGraph
+        .map(_.service)
+        .foreach { service =>
+        service.deleteEdge(e) match {
+          case None =>
+            val cmd = DeleteEdge(e)
+            rejectOnline(sender(), cmd)
+          case Some(newService) =>
+            val deleted = EdgeDeleted(e)
+            val msg = s"train network deleted edge $deleted"
+            trainGraph = Some(TrainGraph(newService))
+            sender() ! deleted
+            log.info(msg)
+        }
       }
 
-    case Event(q: Query, TrainGraph(service)) ⇒
-      val result = handleQuery(service, q)
-      val msg = s"${q.show}: $result"
-      log.info(msg)
-      sender() ! AcceptedQuery(q, msg)
-      stay()
+    case UpdateEdge(weightedEdge, old) ⇒
+      trainGraph
+        .map(_.service)
+        .foreach { s =>
+          s.updateEdge(weightedEdge, old) match {
+            case None =>
+              val cmd = UpdateEdge(weightedEdge, old)
+              rejectOnline(sender(), cmd)
+            case Some(newService) =>
+              val updated = EdgeUpdated(weightedEdge)
+              val msg = s"train network updated edge $updated"
+              trainGraph = Some(TrainGraph(newService))
+              sender() ! updated
+              log.info(msg)
+          }
+        }
 
-    case Event(q: Query, Uninitialized) ⇒
-      rejectQuery(q)
+    case q: Query ⇒
+      trainGraph
+        .map(_.service) match {
+        case Some(service) =>
+          val result = handleQuery(service, q)
+          val msg = s"${q.show}: $result"
+          log.info(msg)
+          sender() ! AcceptedQuery(q, msg)
+        case None =>
+          log.error("created state has unexpected unavailable service") // odd situation, not expected, but we can reject nonetheless
+          rejectQuery(q)
+      }
+
   }
-
-  whenUnhandled {
-    case Event(e, s) ⇒
-      log.warning("received unhandled request {} in state {}/{}", e, stateName, s)
-      stay
-  }
-
-  initialize()
 
   def handleQuery(service: TrainService, q: Query): String=
     q match {
@@ -108,27 +111,26 @@ class TrainActor() extends FSM[State, Data] {
         service.exploreWalksWithinDistanceSelectLast(s, t, limit).show
     }
 
-  def rejectQuery(q: Query): FSM.State[TrainActor.State, Data] = {
+  def rejectQuery(q: Query): Unit = {
     val reject = RejectedQuery(q, s"cannot satisfy query ${q.show} as train network is offline")
     sender() ! reject
     log.warning(reject.toString)
-    goto(Offline) using Uninitialized
   }
 
-  def handleNetworkCreate(edgeCount: Int, weightedEdges: List[RawWeightedEdge]): FSM.State[TrainActor.State, Data] = {
+  def handleNetworkCreate(edgeCount: Int, weightedEdges: List[RawWeightedEdge]): Option[TrainGraph] = {
     val command = NetworkCreate(edgeCount, weightedEdges)
     TrainService.createRoutes(edgeCount, weightedEdges).map(TrainService(_)) match {
       case None =>
         val reject = RejectedCommand(command, s"invalid command $command")
         sender() ! reject
         log.warning(reject.toString)
-        stay()
+        None
       case Some(service) =>
         val created = NetworkCreated(edgeCount, weightedEdges)
         val msg = s"created train network $created"
         sender() ! created
         log.info(msg)
-        goto(Active) using TrainGraph(service)
+        Some(new TrainGraph(service))
     }
 
   }

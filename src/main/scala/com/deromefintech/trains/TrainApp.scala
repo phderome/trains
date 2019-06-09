@@ -32,6 +32,12 @@ object TrainApp extends App {
   val system = ActorSystem("Trains")
   val trainActor = system.actorOf(Props[TrainActor], TrainActor.Name)
 
+  Thread.sleep(2000) // let persistence recover
+  TrainActor.getSampleQueries.foreach(q => trainActor ! q)
+  // try querying immediately even though on this launch we didn't create a graph
+  // On first launch ever, this will get failed queries but on following ones
+  // queries will typically succeed.
+
   (1 to 2).foreach { step =>
     println("enter graph for example Graph: AB5, BC4, CD8, DC8, DE6, AD5, CE2, EB3, AE7")
     val line = scala.io.StdIn.readLine()

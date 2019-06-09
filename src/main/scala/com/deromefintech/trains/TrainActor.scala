@@ -1,22 +1,53 @@
 package com.deromefintech.trains
 
-import akka.actor.{Actor, ActorLogging, ActorRef, Props}
-import TrainActor._
-import com.deromefintech.trains.domain.model._
-class TrainActor() extends Actor with ActorLogging {
+import akka.actor.{ActorLogging, ActorRef, Props}
+import akka.persistence.PersistentActor
+
+import domain.model._
+
+class TrainActor() extends PersistentActor with ActorLogging {
+  import TrainActor._
   import TrainService._
+
+  override def persistenceId: String = self.path.parent.name + "-" +
+    self.path.name
 
   var trainGraph: Option[TrainGraph] = None
 
-  def receive: Receive = create
+  override def receiveCommand: Receive = create
 
-  def create: Receive = {
-    case NetworkCreate(edgeCount, weightedEdges) ⇒
-      handleNetworkCreate(edgeCount, weightedEdges).foreach { g =>
-        trainGraph = Some(g)
+  override def receiveRecover: Receive = {
+    case NetworkCreated(edgeCount, weightedEdges) ⇒
+      TrainService.createRoutes(edgeCount, weightedEdges).map(TrainService(_)).foreach { service =>
+        trainGraph =Some(new TrainGraph(service))
         context.become(created)
       }
 
+    case EdgeDeleted(e) ⇒
+      trainGraph
+        .map(_.service)
+        .foreach { service =>
+          service.deleteEdge(e).foreach { newService =>
+            trainGraph = Some(TrainGraph(newService))
+          }
+        }
+
+    case EdgeUpdated(weightedEdge, old) ⇒
+          trainGraph
+            .map(_.service)
+            .foreach { s =>
+              s.updateEdge(weightedEdge, old).foreach { newService =>
+                trainGraph = Some(TrainGraph(newService))
+              }
+            }
+
+        }
+
+  def create: Receive = {
+    case NetworkCreate(edgeCount, weightedEdges) ⇒
+      handleNetworkCreate(edgeCount, weightedEdges) // (on success becomes created, state change)
+
+    // handle all messages to state we're unable to service, not strictly necessary
     case DeleteEdge(edge) ⇒
       rejectOffline(sender(), DeleteEdge(edge))
 
@@ -38,11 +69,10 @@ class TrainActor() extends Actor with ActorLogging {
     log.warning(reject.toString)
   }
 
-  def created: Receive = {
+  def created: Receive = { // this state is stable and final (by choice)
     case NetworkCreate(edgeCount, weightedEdges) ⇒
-      handleNetworkCreate(edgeCount, weightedEdges).foreach { g =>
-        trainGraph = Some(g)
-      } // on failure, we simply keep former graph, once created, always created.
+      handleNetworkCreate(edgeCount, weightedEdges)
+    // on failure, we simply keep former graph, once created, always created.
 
     case DeleteEdge(e) ⇒
       trainGraph
@@ -51,13 +81,16 @@ class TrainActor() extends Actor with ActorLogging {
         service.deleteEdge(e) match {
           case None =>
             val cmd = DeleteEdge(e)
-            rejectOnline(sender(), cmd)
+            rejectOnline(sender(), cmd) // input is invalid as edge does not exist
           case Some(newService) =>
             val deleted = EdgeDeleted(e)
-            val msg = s"train network deleted edge $deleted"
-            trainGraph = Some(TrainGraph(newService))
-            sender() ! deleted
-            log.info(msg)
+            persist(deleted) { e =>
+              trainGraph = Some(new TrainGraph(newService))
+              context.system.eventStream.publish(e)
+              sender() ! deleted
+              val msg = s"train network deleted edge $deleted"
+              log.info(msg)
+            }
         }
       }
 
@@ -68,13 +101,16 @@ class TrainActor() extends Actor with ActorLogging {
           s.updateEdge(weightedEdge, old) match {
             case None =>
               val cmd = UpdateEdge(weightedEdge, old)
-              rejectOnline(sender(), cmd)
+              rejectOnline(sender(), cmd) // input is invalid as edge with said weight does not exist
             case Some(newService) =>
-              val updated = EdgeUpdated(weightedEdge)
-              val msg = s"train network updated edge $updated"
-              trainGraph = Some(TrainGraph(newService))
-              sender() ! updated
-              log.info(msg)
+              val updated = EdgeUpdated(weightedEdge, old)
+              persist(updated) { e =>
+                trainGraph = Some(new TrainGraph(newService))
+                context.system.eventStream.publish(e)
+                sender() ! updated
+                val msg = s"train network updated edge $updated"
+                log.info(msg)
+              }
           }
         }
 
@@ -117,20 +153,26 @@ class TrainActor() extends Actor with ActorLogging {
     log.warning(reject.toString)
   }
 
-  def handleNetworkCreate(edgeCount: Int, weightedEdges: List[RawWeightedEdge]): Option[TrainGraph] = {
+  def handleNetworkCreate(edgeCount: Int, weightedEdges: List[RawWeightedEdge]): Unit = {
     val command = NetworkCreate(edgeCount, weightedEdges)
     TrainService.createRoutes(edgeCount, weightedEdges).map(TrainService(_)) match {
       case None =>
         val reject = RejectedCommand(command, s"invalid command $command")
         sender() ! reject
         log.warning(reject.toString)
-        None
       case Some(service) =>
-        val created = NetworkCreated(edgeCount, weightedEdges)
-        val msg = s"created train network $created"
-        sender() ! created
-        log.info(msg)
-        Some(new TrainGraph(service))
+        val event = NetworkCreated(edgeCount, weightedEdges)
+        val creating = trainGraph.isEmpty
+        persist(event) { e =>
+          trainGraph = Some(new TrainGraph(service))
+          context.system.eventStream.publish(e)
+          sender() ! created
+          val msg = s"created train network $event"
+          log.info(msg)
+          if (creating) {
+            context.become(created)
+          }
+        }
     }
 
   }

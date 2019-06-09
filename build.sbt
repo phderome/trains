@@ -15,6 +15,8 @@ libraryDependencies ++= Seq(
   "org.typelevel"     %% "cats-core"         % catsVersion,
   "com.typesafe.akka" %% "akka-actor"        % akkaVersion,
   "com.typesafe.akka" %% "akka-persistence-typed"  % akkaVersion,
+  "org.iq80.leveldb"  % "leveldb" % "0.7", // 0.7 previously, most recent 0.11
+  "org.fusesource.leveldbjni" % "leveldbjni-all" % "1.8",
   "org.scalacheck"    %% "scalacheck"        % scalaCheckVersion % "test",
   "org.specs2"        %% "specs2-core"       % specs2Version     % "test",
   "org.specs2"        %% "specs2-scalacheck" % specs2Version     % "test"

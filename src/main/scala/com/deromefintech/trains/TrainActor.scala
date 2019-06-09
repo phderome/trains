@@ -9,8 +9,8 @@ class TrainActor() extends FSM[State, Data] {
   startWith(Offline, Uninitialized)
 
   when(Offline) {
-    case Event(NetworkCreateCommand(edgeCount, weightedEdges), _) ⇒
-      handleNetworkCreateCommand(edgeCount, weightedEdges)
+    case Event(NetworkCreate(edgeCount, weightedEdges), _) ⇒
+      handleNetworkCreate(edgeCount, weightedEdges)
 
     case Event(q: Query, _) ⇒
       rejectQuery(q)
@@ -18,11 +18,12 @@ class TrainActor() extends FSM[State, Data] {
 
   onTransition {
     case Active -> Offline ⇒ () // nothing to do
+    case Offline -> Active ⇒ () // nothing to do
   }
 
   when(Active) {
-    case Event(NetworkCreateCommand(edgeCount, weightedEdges), _) ⇒
-      handleNetworkCreateCommand(edgeCount, weightedEdges)
+    case Event(NetworkCreate(edgeCount, weightedEdges), _) ⇒
+      handleNetworkCreate(edgeCount, weightedEdges)
 
     case Event(q: Query, TrainGraph(service)) ⇒
       val result = handleQuery(service, q)
@@ -68,17 +69,18 @@ class TrainActor() extends FSM[State, Data] {
     goto(Offline) using Uninitialized
   }
 
-  def handleNetworkCreateCommand(edgeCount: Int, weightedEdges: List[RawWeightedEdge]): FSM.State[TrainActor.State, Data] = {
-    val command = NetworkCreateCommand(edgeCount, weightedEdges)
+  def handleNetworkCreate(edgeCount: Int, weightedEdges: List[RawWeightedEdge]): FSM.State[TrainActor.State, Data] = {
+    val command = NetworkCreate(edgeCount, weightedEdges)
     TrainService.createRoutes(edgeCount, weightedEdges).map(TrainService(_)) match {
       case None =>
-        val reject = RejectedCommand(s"invalid command $command")
+        val reject = RejectedCommand(command, s"invalid command $command")
         sender() ! reject
         log.warning(reject.toString)
-        goto(Offline) using Uninitialized
+        stay()
       case Some(service) =>
-        val msg = s"instantiated train network from $command"
-        sender() ! AcceptedCommand(msg)
+        val created = NetworkCreated(edgeCount, weightedEdges)
+        val msg = s"created train network $created"
+        sender() ! created
         log.info(msg)
         goto(Active) using TrainGraph(service)
     }
@@ -102,12 +104,14 @@ object TrainActor {
 
   object Messages {
 
-    // Supported Messages: Response, Query and NetworkCreateCommand
+    // Supported Messages: Response, Event, Query, and Command (NetworkCreate)
     sealed trait Response
     final case class RejectedQuery(q: Query, msg: String)
     final case class AcceptedQuery(q: Query, result: String)
-    final case class AcceptedCommand(msg: String)
-    final case class RejectedCommand(msg: String)
+    final case class RejectedCommand(cmd: Command, msg: String)
+
+    sealed trait Event
+    final case class NetworkCreated(edgeCount: Int, weightedEdges: List[RawWeightedEdge]) extends Event
 
     sealed trait Query {
       def show: String
@@ -137,7 +141,7 @@ object TrainActor {
     }
 
     sealed trait Command
-    final case class NetworkCreateCommand(edgeCount: Int, weightedEdges: List[RawWeightedEdge]) extends Command
+    final case class NetworkCreate(edgeCount: Int, weightedEdges: List[RawWeightedEdge]) extends Command
   }
 
   import Messages._

@@ -8,11 +8,11 @@ import scala.concurrent.duration._
 object Trains extends App {
   import TrainActor.Messages._
 
-  def getNetworkCreateCommand(line: String): NetworkCreateCommand = {
+  def getNetworkCreateCommand(line: String): NetworkCreate = {
     val tokens = line
       .split(", ")
       .toList
-    if (tokens.exists(_.length < 3)) NetworkCreateCommand(0, List.empty[RawWeightedEdge])
+    if (tokens.exists(_.length < 3)) NetworkCreate(0, List.empty[RawWeightedEdge])
     else {
       val Pattern = "([a-zA-Z])([a-zA-Z])(\\d+)".r // to extract AB123 into A-B-123
       // edges will not accept nodes going to themselves, if tokens contain some our line is invalid
@@ -25,7 +25,7 @@ object Trains extends App {
         weight = m.group(3).toInt
       } yield (a, b, weight)
       val wEdges = edges.map { case(s, t, w) => RawWeightedEdge(s, t, w) }
-      NetworkCreateCommand(tokens.length, wEdges)
+      NetworkCreate(tokens.length, wEdges)
     }
   }
 
@@ -36,7 +36,9 @@ object Trains extends App {
     println("enter graph for example Graph: AB5, BC4, CD8, DC8, DE6, AD5, CE2, EB3, AE7")
     val line = scala.io.StdIn.readLine()
     trainActor ! getNetworkCreateCommand(line)
+    Thread.sleep(3000) // so that the (new effective) network is available for queries to function as we don't consume feedback messages
     TrainActor.getSampleQueries.foreach(q => trainActor ! q)
   }
-  Await.ready(system.terminate(), 5.seconds)
+  Thread.sleep(1000) // so that we avoid dead letters and can see results back in Akka logging
+  Await.ready(system.terminate(), 15.seconds)
 }

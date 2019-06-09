@@ -2,9 +2,9 @@ package com.deromefintech.trains
 
 import akka.actor.{FSM, Props}
 import TrainActor._
+import com.deromefintech.trains.domain.model._
 class TrainActor() extends FSM[State, Data] {
   import TrainService._
-  import Messages._
 
   startWith(Offline, Uninitialized)
 
@@ -102,49 +102,8 @@ object TrainActor {
   protected case object Uninitialized extends Data
   protected final case class TrainGraph(service: TrainService) extends Data
 
-  object Messages {
+  // Supported Messages are from trains.domain.model
 
-    // Supported Messages: Response, Event, Query, and Command (NetworkCreate)
-    sealed trait Response
-    final case class RejectedQuery(q: Query, msg: String)
-    final case class AcceptedQuery(q: Query, result: String)
-    final case class RejectedCommand(cmd: Command, msg: String)
-
-    sealed trait Event
-    final case class NetworkCreated(edgeCount: Int, weightedEdges: List[RawWeightedEdge]) extends Event
-
-    sealed trait Query {
-      def show: String
-    }
-
-    final case class Distance(walk: Seq[Char]) extends Query {
-      def show: String = {
-        val fmtWalk = new String(walk.toArray)
-        s"Distance($fmtWalk)"
-      }
-    }
-
-    final case class WalksMaxHopsSelectLast(s: Char, t: Char, limit: Int) extends Query {
-      def show: String = s"WalksMaxHopsSelectLast($s, $t, $limit)"
-    }
-
-    final case class WalksExactSelectLast(s: Char, t: Char, limit: Int) extends Query {
-      def show: String = s"WalksExactSelectLast($s, $t, $limit)"
-    }
-
-    final case class ShortestRoute(s: Char, t: Char) extends Query {
-      def show: String = s"ShortestRoute($s, $t)"
-    }
-
-    final case class WalksWithinDistanceSelectLast(s: Char, t: Char, limit: Int) extends Query {
-      def show: String = s"WalksWithinDistanceSelectLast($s, $t, $limit)"
-    }
-
-    sealed trait Command
-    final case class NetworkCreate(edgeCount: Int, weightedEdges: List[RawWeightedEdge]) extends Command
-  }
-
-  import Messages._
   // for testing.
   def getSampleQueries: List[Query] = {
     /*

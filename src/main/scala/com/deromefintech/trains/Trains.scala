@@ -1,12 +1,12 @@
 package com.deromefintech.trains
 
 import akka.actor._
+import com.deromefintech.trains.domain.model.NetworkCreate
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
 
 object Trains extends App {
-  import TrainActor.Messages._
 
   def getNetworkCreateCommand(line: String): NetworkCreate = {
     val tokens = line

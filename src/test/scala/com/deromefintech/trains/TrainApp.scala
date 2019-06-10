@@ -1,6 +1,6 @@
 package com.deromefintech.trains
 
-import akka.actor._
+import akka.actor.{ActorSystem, Props}
 import domain.model.{DeleteEdge, NetworkCreate, UpdateEdge}
 
 import scala.concurrent.Await
@@ -44,7 +44,7 @@ object TrainApp extends App {
     trainActor ! getNetworkCreateCommand(line)
     if (step == 2) {
       // testing graph editing
-      trainActor ! UpdateEdge(RawWeightedEdge(RawEdge('A', 'E'), 17), formerWeight=7)
+      trainActor ! UpdateEdge(RawWeightedEdge(RawEdge('A', 'D'), 9), formerWeight=5)
       trainActor ! DeleteEdge(RawWeightedEdge(RawEdge('E', 'B'), 3)) // success, triggering no route for AEBCD
       trainActor ! DeleteEdge(RawWeightedEdge(RawEdge('A', 'F'), 1)) // failure
     }

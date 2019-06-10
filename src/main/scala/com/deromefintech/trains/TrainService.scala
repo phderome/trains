@@ -4,8 +4,8 @@ import scalax.collection.Graph
 import scalax.collection.edge.WDiEdge
 import scalax.collection.GraphPredef._
 import scalax.collection.edge.Implicits._
-
 import cats.implicits._
+import domain.model.{RawEdge, RawWeightedEdge}
 
 import scala.collection.mutable.ListBuffer
 
@@ -143,24 +143,18 @@ final case class TrainService(routes: Graph[Char, WDiEdge])  {
       _ <- routes.find(weightedEdge.edge.s)
       _ <- routes.find(weightedEdge.edge.t)
     } yield {
-      val newRoutes = (routes - weightedEdge.copy(w = old)) + weightedEdge
+      val newRoutes = (routes - weightedEdge.copy(w = old).wdiEdge) + weightedEdge.wdiEdge
       TrainService(newRoutes)
     }
   }
 
   def deleteEdge(weightedEdge: RawWeightedEdge): Option[TrainService] = {
     routes
-      .find(weightedEdge)
+      .find(weightedEdge.wdiEdge)
       .map { toDelete => TrainService(routes - toDelete) }
   }
 }
 
-final case class RawEdge(s: Char, t: Char)
-final case class RawWeightedEdge(edge: RawEdge, w: Int)
-object RawWeightedEdge {
-  implicit def toWDiEdge(e: RawWeightedEdge): WDiEdge[Char] =
-    e.edge.s ~> e.edge.t % e.w
-}
 
 object TrainService {
   type NodeSeq = Vector[Char]
@@ -174,6 +168,10 @@ object TrainService {
   }
   implicit class ShowWalk(nodes: List[TrainService.NodeSeq]) {
     def show: String = nodes.length.toString
+  }
+
+  implicit class RawWeightedEdgeOps(e: RawWeightedEdge) {
+    def wdiEdge:  WDiEdge[Char]  =  e.edge.s ~> e.edge.t % e.w
   }
 
   def createRoutes(edgeCount: Int, weightedEdges: List[RawWeightedEdge]): Option[Graph[Char, WDiEdge]] = {

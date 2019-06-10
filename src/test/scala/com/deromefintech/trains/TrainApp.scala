@@ -1,7 +1,7 @@
 package com.deromefintech.trains
 
 import akka.actor.{ActorSystem, Props}
-import domain.model.{DeleteEdge, NetworkCreate, UpdateEdge}
+import domain.model._
 
 import scala.concurrent.Await
 import scala.concurrent.duration._

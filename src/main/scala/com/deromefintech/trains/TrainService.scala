@@ -168,7 +168,6 @@ object TrainService {
   implicit class ShowWalk(nodes: List[TrainService.NodeSeq]) {
     def show: String = nodes.length.toString
   }
-
   implicit class RawWeightedEdgeOps(e: RawWeightedEdge) {
     def wdiEdge:  WDiEdge[Char]  =  e.edge.s ~> e.edge.t % e.w
   }

@@ -58,15 +58,15 @@ class TrainActor() extends PersistentActor with ActorLogging {
   }
 
   private def rejectOffline(ref: ActorRef, c: Command): Unit = {
-    val reject = RejectedCommand(c, s"invalid command $c as train network is offline")
-    sender() ! reject
-    log.warning(reject.toString)
+    val rejected: Either[Accepted, Rejected] = Right(Rejected(s"invalid command $c as train network is offline"))
+    sender() ! rejected
+    log.warning(rejected.toString)
   }
 
   private def rejectOnline(ref: ActorRef, c: Command): Unit = {
-    val reject = RejectedCommand(c, s"invalid command $c")
-    sender() ! reject
-    log.warning(reject.toString)
+    val rejected: Either[Accepted, Rejected] = Right(Rejected(s"invalid command $c"))
+    sender() ! rejected
+    log.warning(rejected.toString)
   }
 
   def created: Receive = { // this state is stable and final (by choice)
@@ -121,7 +121,8 @@ class TrainActor() extends PersistentActor with ActorLogging {
           val result = handleQuery(service, q)
           val msg = s"${q.show}: $result"
           log.info(msg)
-          sender() ! AcceptedQuery(q, msg)
+          val accepted: Either[Accepted, Rejected]= Left(Accepted(msg))
+          sender() ! accepted
         case None =>
           log.error("created state has unexpected unavailable service") // odd situation, not expected, but we can reject nonetheless
           rejectQuery(q)
@@ -148,25 +149,26 @@ class TrainActor() extends PersistentActor with ActorLogging {
     }
 
   def rejectQuery(q: Query): Unit = {
-    val reject = RejectedQuery(q, s"cannot satisfy query ${q.show} as train network is offline")
-    sender() ! reject
-    log.warning(reject.toString)
+    val rejected: Either[Accepted, Rejected] =
+      Right(Rejected(s"cannot satisfy query ${q.show} as train network is offline"))
+    sender() ! rejected
+    log.warning(rejected.toString)
   }
 
   def handleNetworkCreate(edgeCount: Int, weightedEdges: List[RawWeightedEdge]): Unit = {
     val command = NetworkCreate(edgeCount, weightedEdges)
     TrainService.createRoutes(edgeCount, weightedEdges).map(TrainService(_)) match {
       case None =>
-        val reject = RejectedCommand(command, s"invalid command $command")
-        sender() ! reject
-        log.warning(reject.toString)
+        val rejected: Either[Accepted, Rejected] = Right(Rejected(s"invalid command $command"))
+        sender() ! rejected
+        log.warning(rejected.toString)
       case Some(service) =>
         val event = NetworkCreated(edgeCount, weightedEdges)
         val creating = trainGraph.isEmpty
         persist(event) { e =>
           trainGraph = Some(TrainGraph(service))
           context.system.eventStream.publish(e)
-          sender() ! created
+          sender() ! event
           val msg = s"created train network $event"
           log.info(msg)
           if (creating) {

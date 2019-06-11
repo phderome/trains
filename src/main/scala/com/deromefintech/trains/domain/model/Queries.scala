@@ -4,11 +4,8 @@ sealed trait Query {
   def show: String
 }
 
-final case class Distance(walk: Seq[Char]) extends Query {
-  def show: String = {
-    val fmtWalk = new String(walk.toArray)
-    s"Distance($fmtWalk)"
-  }
+final case class Distance(walk: String) extends Query {
+  def show: String = s"Distance($walk)"
 }
 
 final case class WalksMaxHopsSelectLast(s: Char, t: Char, limit: Int) extends Query {

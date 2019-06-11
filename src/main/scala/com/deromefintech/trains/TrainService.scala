@@ -57,7 +57,7 @@ final case class TrainService(routes: Graph[Char, WDiEdge])  {
     node(s).getOneHopDistance(node(t))
 
   // all we are doing is using the Graph API to construct a valid walk if walk is valid and ask API to give us back the weight.
-  def getDistance(walk: Seq[Char]): Option[Int] = {
+  def getDistance(walk: String): Option[Int] = {
     if (walk.lengthCompare(2) < 0) None
     else {
       val walkBuilder = node(walk.head).map(h => routes.newWalkBuilder(h)(walk.length))
@@ -120,7 +120,7 @@ final case class TrainService(routes: Graph[Char, WDiEdge])  {
           walk <- eligibleWalks
           successor <- node(walk.last).diSuccessors.toList
           newWalk = walk :+ successor.toOuter
-          newWalkDistance <- getDistance(newWalk) if newWalkDistance < limit
+          newWalkDistance <- getDistance(newWalk.mkString) if newWalkDistance < limit
         } yield newWalk
 
       eligibleWalks = nextEligibleWalks
@@ -154,7 +154,6 @@ final case class TrainService(routes: Graph[Char, WDiEdge])  {
       .map { toDelete => TrainService(routes - toDelete) }
   }
 }
-
 
 object TrainService {
   type NodeSeq = Vector[Char]

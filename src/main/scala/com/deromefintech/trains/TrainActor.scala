@@ -19,7 +19,7 @@ class TrainActor() extends PersistentActor with ActorLogging {
   override def receiveRecover: Receive = {
     case NetworkCreated(edgeCount, weightedEdges) ⇒
       TrainService.createRoutes(edgeCount, weightedEdges).map(TrainService(_)).foreach { service =>
-        trainGraph =Some(new TrainGraph(service))
+        trainGraph =Some(TrainGraph(service))
         context.become(created)
       }
 
@@ -85,7 +85,7 @@ class TrainActor() extends PersistentActor with ActorLogging {
           case Some(newService) =>
             val deleted = EdgeDeleted(e)
             persist(deleted) { e =>
-              trainGraph = Some(new TrainGraph(newService))
+              trainGraph = Some(TrainGraph(newService))
               context.system.eventStream.publish(e)
               sender() ! deleted
               val msg = s"train network deleted edge $deleted"
@@ -105,7 +105,7 @@ class TrainActor() extends PersistentActor with ActorLogging {
             case Some(newService) =>
               val updated = EdgeUpdated(weightedEdge, old)
               persist(updated) { e =>
-                trainGraph = Some(new TrainGraph(newService))
+                trainGraph = Some(TrainGraph(newService))
                 context.system.eventStream.publish(e)
                 sender() ! updated
                 val msg = s"train network updated edge $updated"
@@ -164,7 +164,7 @@ class TrainActor() extends PersistentActor with ActorLogging {
         val event = NetworkCreated(edgeCount, weightedEdges)
         val creating = trainGraph.isEmpty
         persist(event) { e =>
-          trainGraph = Some(new TrainGraph(service))
+          trainGraph = Some(TrainGraph(service))
           context.system.eventStream.publish(e)
           sender() ! created
           val msg = s"created train network $event"
@@ -181,6 +181,7 @@ class TrainActor() extends PersistentActor with ActorLogging {
 object TrainActor {
 
   final val Name = "train-actor"
+  final val WebName = "web-train-actor"
 
   def apply(): Props = Props(new TrainActor())
 
@@ -203,7 +204,7 @@ object TrainActor {
      The distance of the route A-E-B-C-D.
      The distance of the route A-E-D.
     */
-    val distanceQueries = List("ABC", "AD", "ADC", "AEBCD", "AED").map(Distance(_))
+    val distanceQueries = List("ABC", "AD", "ADC", "AEBCD", "AED").map(Distance)
 
     /*
       The number of trips starting at C and ending at C with a maximum of 3

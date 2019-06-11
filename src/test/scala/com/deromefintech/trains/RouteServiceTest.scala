@@ -116,7 +116,7 @@ object routeservicespec extends Specification with ScalaCheck {
       val service = new TrainService(graph)
       val walkDistances = service
         .exploreWalksWithinDistance(graph.nodes.head, limitDistance)
-        .flatMap(service.getDistance)
+        .flatMap(xs => service.getDistance(xs.mkString))
       walkDistances.forall {
         _ <= limitDistance
       }
@@ -161,7 +161,7 @@ object routeservicespec extends Specification with ScalaCheck {
           val service = new TrainService(graph)
           val charNodes = c.nodes.map(_.toOuter).toList
           val bruteForceDistance = c.edges.map(_.weight.toInt).sum
-          service.getDistance(charNodes) must beSome(bruteForceDistance)
+          service.getDistance(charNodes.mkString) must beSome(bruteForceDistance)
         }
     }
 
@@ -170,7 +170,7 @@ object routeservicespec extends Specification with ScalaCheck {
       val graph = Graph.from(Nil, edges)
       graph.findCycle.forall { c =>
         val service = new TrainService(graph)
-        val charNodes = c.nodes.map(_.toOuter).toList
+        val charNodes = c.nodes.map(_.toOuter).toList.mkString
         service.getDistance(charNodes) must beSome(c.edges.size)
       }
     }

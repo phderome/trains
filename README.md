@@ -1,24 +1,24 @@
 To build:
 
-Use sbt 1.2.6
+Use sbt 1.2.6 (value in project/build.properties)
 
-$ sbt run
+$ sbt 
+sbt:TrainApp> run 
 
-$ sbt test
+Multiple main classes detected, select one to run:
+
+ [1] com.deromefintech.trains.TrainApp
+ [2] com.deromefintech.trains.TrainWebServer
+
+// If choosing 2, in another terminal enter curl commands as per comments in TrainWebServer, not much interesting happens
+// before the first meaningful POST command (say "create-network") other than error handling
+// If choosing 1, enter the line that is prompted at you to create a graph. See Sample run below.
+// The two apps use different persistent entities.
+
+sbt:TrainApp> test  // runs 10 unit tests exercising graph computations used by TrainWebServer or TrainApp
  
-To have a more pleasant test experience, build from Intellij IDEA and run tests.
  
 Sample run:
-
-MacBook-Pro-3:trains philippederome$ ls
-
-README.md	Trains.ipr	Trains.iws	build.sbt	project		src		target
-
-MacBook-Pro-3:trains philippederome$ sbt run
-
-[info] Loading settings for project global-plugins from idea.sbt ...
-
-... skipped
 
 [info] Running com.deromefintech.trains.TrainApp 
 
@@ -46,7 +46,7 @@ Output #9: 9
 
 Output #10: 7
 
-[success] Total time: 16 s, completed 23-Oct-2018 7:39:50 AM
+[success] ...
 
 MacBook-Pro-3:trains philippederome$ sbt test
 
@@ -68,4 +68,4 @@ MacBook-Pro-3:trains philippederome$ sbt test
 
 [info] Passed: Total 10, Failed 0, Errors 0, Passed 10
 
-[success] Total time: 10 s, completed 23-Oct-2018 7:40:14 AM
+[success] ...

@@ -54,8 +54,8 @@ object TrainWebServer {
 
   def route(trainActor: ActorRef): Route =
 
-    pathPrefix("distance") {  // curl http://localhost:8080/distance/A/dest/C
-      path(Segment / "dest" / Segment) { (s, t) =>
+    pathPrefix("distance") {  // "curl http://localhost:8080/distance?src=A&dest=C"
+      parameters('src, 'dest) { (s, t) =>
         get {
           lazy val badInput = s"invalid s($s)--t($t)"
           val distance = (s.headOption, t.headOption)
@@ -74,8 +74,8 @@ object TrainWebServer {
         }
       }
     } ~ // we could add all the GET end points, we get the idea.
-      pathPrefix("walksMaxHopsSelectLast") {  // curl http://localhost:8080/walksMaxHopsSelectLast/A/dest/C/limit/5
-        path(Segment / "dest" / Segment / "limit" / Segment) { (s, t, limit) =>
+      pathPrefix("walksMaxHopsSelectLast") {  // curl "http://localhost:8080/walksMaxHopsSelectLast?src=A&dest=C&limit=5"
+        parameters('src, 'dest, 'limit) { (s, t, limit) =>
           get {
             lazy val badInput = s"invalid s($s)--t($t) limit($limit)"
             val walk = (s.headOption, t.headOption, Try(limit.toInt).toOption)

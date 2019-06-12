@@ -62,17 +62,15 @@ object TrainWebServer {
             tt <- t.headOption
           } yield Distance(List(ss, tt).mkString)
 
-          val response: Future[Either[Accepted, Rejected]] =
+          val response: Future[Either[Rejected, Accepted]] =
             distance match {
-              case Some(d) => (trainActor ? d).mapTo[Either[Accepted, Rejected]]
+              case Some(d) => (trainActor ? d).mapTo[Either[Rejected, Accepted]]
               case None => Future.failed(new RuntimeException(badInput))
             }
 
           onSuccess(response) {
-            case Left(Accepted(result)) =>
-              complete(Accepted(result))
-            case _ =>
-              complete(StatusCodes.NotFound)
+            case Right(e) => complete(e)
+            case _ => complete(StatusCodes.NotFound)
           }
         }
       }
@@ -87,17 +85,15 @@ object TrainWebServer {
               lim <- Try(limit.toInt).toOption
             } yield WalksMaxHopsSelectLast(ss, tt, lim)
 
-            val response: Future[Either[Accepted, Rejected]] =
+            val response: Future[Either[Rejected, Accepted]] =
               walk match {
-                case Some(w) => (trainActor ? w).mapTo[Either[Accepted, Rejected]]
+                case Some(w) => (trainActor ? w).mapTo[Either[Rejected, Accepted]]
                 case None => Future.failed(new RuntimeException(badInput))
               }
 
             onSuccess(response) {
-              case Left(Accepted(result)) =>
-                complete(Accepted(result))
-              case _ =>
-                complete(StatusCodes.NotFound)
+              case Right(e) => complete(e)
+              case _ => complete(StatusCodes.NotFound)
             }
           }
         }
@@ -107,14 +103,12 @@ object TrainWebServer {
             // example
             // curl -H "Content-Type: application/json" -X POST -d '{"edge":{"edge":{"s":"A", "t":"B"},"w":2}}'
             // http://localhost:8080/delete-edge
-            entity(as[DeleteEdge]) { network =>
-              val edgeDeleted: Future[Either[EdgeDeleted, Rejected]] =
-                (trainActor ? (network)).mapTo[Either[EdgeDeleted, Rejected]]
+            entity(as[DeleteEdge]) { e =>
+              val edgeDeleted: Future[Either[Rejected, EdgeDeleted]] =
+                (trainActor ? e).mapTo[Either[Rejected, EdgeDeleted]]
               onSuccess(edgeDeleted) {
-                case Left(EdgeDeleted(edge)) =>
-                  complete(EdgeDeleted(edge))
-                case _ =>
-                  complete(StatusCodes.NotFound)
+                case Right(e) => complete(e)
+                case _ => complete(StatusCodes.NotFound)
               }
             }
           }
@@ -124,14 +118,12 @@ object TrainWebServer {
             // example
             // curl -H "Content-Type: application/json" -X POST -d '{"edge":{"edge":{"s":"A", "t":"B"},"w":2},"formerWeight":0}'
             // http://localhost:8080/update-edge
-            entity(as[UpdateEdge]) { network =>
-              val edgeUpdated: Future[Either[EdgeUpdated, Rejected]] =
-                (trainActor ? (network)).mapTo[Either[EdgeUpdated, Rejected]]
+            entity(as[UpdateEdge]) { e =>
+              val edgeUpdated: Future[Either[Rejected, EdgeUpdated]] =
+                (trainActor ? e).mapTo[Either[Rejected, EdgeUpdated]]
               onSuccess(edgeUpdated) {
-                case Left(EdgeUpdated(edge, formerWeight)) =>
-                  complete(EdgeUpdated(edge, formerWeight))
-                case _ =>
-                  complete(StatusCodes.NotFound)
+                case Right(e) => complete(e)
+                case _ => complete(StatusCodes.NotFound)
               }
             }
           }
@@ -141,14 +133,12 @@ object TrainWebServer {
             // example
             // curl -H "Content-Type: application/json" -X POST -d '{"edgeCount":1,
             // "weightedEdges":[{"edge":{"s":"A", "t":"B"},"w":2}]}' http://localhost:8080/create-network
-            entity(as[NetworkCreate]) { network =>
-              val saved: Future[Either[NetworkCreated, Rejected]] =
-                (trainActor ? (network)).mapTo[Either[NetworkCreated, Rejected]]
+            entity(as[NetworkCreate]) { e =>
+              val saved: Future[Either[Rejected, NetworkCreated]] =
+                (trainActor ? e).mapTo[Either[Rejected, NetworkCreated]]
               onSuccess(saved) {
-                case Left(NetworkCreated(edgeCount, weightedEdges)) =>
-                  complete(NetworkCreated(edgeCount, weightedEdges))
-                case _ =>
-                  complete(StatusCodes.NotFound)
+                case Right(e) => complete(e)
+                case _ => complete(StatusCodes.NotFound)
               }
             }
           }

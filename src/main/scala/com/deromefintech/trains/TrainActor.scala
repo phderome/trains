@@ -58,13 +58,13 @@ class TrainActor() extends PersistentActor with ActorLogging {
   }
 
   private def rejectOffline(ref: ActorRef, c: Command): Unit = {
-    val rejected: Either[Accepted, Rejected] = Right(Rejected(s"invalid command $c as train network is offline"))
+    val rejected: Either[Rejected, Accepted] = Left(Rejected(s"invalid command $c as train network is offline"))
     sender() ! rejected
     log.warning(rejected.toString)
   }
 
   private def rejectOnline(ref: ActorRef, c: Command): Unit = {
-    val rejected: Either[Accepted, Rejected] = Right(Rejected(s"invalid command $c"))
+    val rejected: Either[Rejected, Accepted] = Left(Rejected(s"invalid command $c"))
     sender() ! rejected
     log.warning(rejected.toString)
   }
@@ -82,7 +82,7 @@ class TrainActor() extends PersistentActor with ActorLogging {
           case None =>
             val cmd = DeleteEdge(e)
             // input is invalid as edge with said weight does not exist
-            val rejected: Either[EdgeDeleted, Rejected] = Right(Rejected(s"invalid command $cmd"))
+            val rejected: Either[Rejected, EdgeDeleted] = Left(Rejected(s"invalid command $cmd"))
             sender() ! rejected
             log.warning(rejected.toString)
           case Some(newService) =>
@@ -90,7 +90,7 @@ class TrainActor() extends PersistentActor with ActorLogging {
             persist(deleted) { e =>
               trainGraph = Some(TrainGraph(newService))
               context.system.eventStream.publish(e)
-              val accepted: Either[EdgeDeleted, Rejected] = Left(deleted)
+              val accepted: Either[Rejected, EdgeDeleted] = Right(deleted)
               sender() ! accepted
               val msg = s"train network deleted edge $deleted"
               log.info(msg)
@@ -106,7 +106,7 @@ class TrainActor() extends PersistentActor with ActorLogging {
             case None =>
               val cmd = UpdateEdge(weightedEdge, old)
               // input is invalid as edge with said weight does not exist
-              val rejected: Either[EdgeUpdated, Rejected] = Right(Rejected(s"invalid command $cmd"))
+              val rejected: Either[Rejected, EdgeUpdated] = Left(Rejected(s"invalid command $cmd"))
               sender() ! rejected
               log.warning(rejected.toString)
             case Some(newService) =>
@@ -114,7 +114,7 @@ class TrainActor() extends PersistentActor with ActorLogging {
               persist(updated) { e =>
                 trainGraph = Some(TrainGraph(newService))
                 context.system.eventStream.publish(e)
-                val accepted: Either[EdgeUpdated, Rejected] = Left(updated)
+                val accepted: Either[Rejected, EdgeUpdated] = Right(updated)
                 sender() ! accepted
                 val msg = s"train network updated edge $updated"
                 log.info(msg)
@@ -129,7 +129,7 @@ class TrainActor() extends PersistentActor with ActorLogging {
           val result = handleQuery(service, q)
           val msg = s"${q.show}: $result"
           log.info(msg)
-          val accepted: Either[Accepted, Rejected]= Left(Accepted(msg))
+          val accepted: Either[Rejected, Accepted]= Right(Accepted(msg))
           sender() ! accepted
         case None =>
           log.error("created state has unexpected unavailable service") // odd situation, not expected, but we can reject nonetheless
@@ -157,8 +157,8 @@ class TrainActor() extends PersistentActor with ActorLogging {
     }
 
   def rejectQuery(q: Query): Unit = {
-    val rejected: Either[Accepted, Rejected] =
-      Right(Rejected(s"cannot satisfy query ${q.show} as train network is offline"))
+    val rejected: Either[Rejected, Accepted] =
+      Left(Rejected(s"cannot satisfy query ${q.show} as train network is offline"))
     sender() ! rejected
     log.warning(rejected.toString)
   }
@@ -167,7 +167,7 @@ class TrainActor() extends PersistentActor with ActorLogging {
     val command = NetworkCreate(edgeCount, weightedEdges)
     TrainService.createRoutes(edgeCount, weightedEdges).map(TrainService(_)) match {
       case None =>
-        val rejected: Either[NetworkCreated, Rejected] = Right(Rejected(s"invalid command $command"))
+        val rejected: Either[Rejected, NetworkCreated] = Left(Rejected(s"invalid command $command"))
         sender() ! rejected
         log.warning(rejected.toString)
       case Some(service) =>
@@ -176,7 +176,7 @@ class TrainActor() extends PersistentActor with ActorLogging {
         persist(event) { e =>
           trainGraph = Some(TrainGraph(service))
           context.system.eventStream.publish(e)
-          val accepted: Either[NetworkCreated, Rejected] = Left(event)
+          val accepted: Either[Rejected, NetworkCreated] = Right(event)
           sender() ! accepted
           val msg = s"created train network $event"
           log.info(msg)

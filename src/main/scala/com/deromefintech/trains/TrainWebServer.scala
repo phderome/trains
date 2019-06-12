@@ -17,6 +17,7 @@ import spray.json.DefaultJsonProtocol._
 import scala.concurrent.Future
 import scala.io.StdIn
 import scala.util.Try
+import cats.implicits._
 
 object TrainWebServer {
 
@@ -57,10 +58,8 @@ object TrainWebServer {
       path(Segment / "dest" / Segment) { (s, t) =>
         get {
           lazy val badInput = s"invalid s($s)--t($t)"
-          val distance = for {
-            ss <- s.headOption
-            tt <- t.headOption
-          } yield Distance(List(ss, tt).mkString)
+          val distance = (s.headOption, t.headOption)
+            .mapN((s, t) => Distance(List(s, t).mkString))
 
           val response: Future[Either[Rejected, Accepted]] =
             distance match {
@@ -79,11 +78,8 @@ object TrainWebServer {
         path(Segment / "dest" / Segment / "limit" / Segment) { (s, t, limit) =>
           get {
             lazy val badInput = s"invalid s($s)--t($t) limit($limit)"
-            val walk = for {
-              ss <- s.headOption
-              tt <- t.headOption
-              lim <- Try(limit.toInt).toOption
-            } yield WalksMaxHopsSelectLast(ss, tt, lim)
+            val walk = (s.headOption, t.headOption, Try(limit.toInt).toOption)
+              .mapN((s, t, lim) => WalksMaxHopsSelectLast(s, t, lim))
 
             val response: Future[Either[Rejected, Accepted]] =
               walk match {

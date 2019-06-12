@@ -52,6 +52,19 @@ object TrainWebServer {
   implicit val acceptedQueryFormat = jsonFormat1(Accepted)
   implicit val rejectedResponseFormat = jsonFormat1(Rejected)
 
+  def submitQuery(q: Option[Query], ref: ActorRef, error: => String): Route = {
+    val response: Future[Either[Rejected, Accepted]] =
+      q match {
+        case Some(x) => (ref ? x).mapTo[Either[Rejected, Accepted]]
+        case None => Future.failed(new RuntimeException(error))
+      }
+
+    onSuccess(response) {
+      case Right(e) => complete(e)
+      case _ => complete(StatusCodes.NotFound)
+    }
+  }
+
   def route(trainActor: ActorRef): Route =
 
     pathPrefix("distance") {  // curl "http://localhost:8080/distance?src=A&dest=C"
@@ -60,20 +73,22 @@ object TrainWebServer {
           lazy val badInput = s"invalid s($s)--t($t)"
           val distance = (s.headOption, t.headOption)
             .mapN((s, t) => Distance(List(s, t).mkString))
-
-          val response: Future[Either[Rejected, Accepted]] =
-            distance match {
-              case Some(d) => (trainActor ? d).mapTo[Either[Rejected, Accepted]]
-              case None => Future.failed(new RuntimeException(badInput))
-            }
-
-          onSuccess(response) {
-            case Right(e) => complete(e)
-            case _ => complete(StatusCodes.NotFound)
-          }
+          submitQuery(distance, trainActor, badInput)
         }
       }
-    } ~ // we could add all the GET end points, we get the idea.
+    } ~
+      pathPrefix("shortest") {  // curl "http://localhost:8080/shortest?src=A&dest=C"
+        parameters('src, 'dest) { (s, t) =>
+          get {
+            lazy val badInput = s"invalid s($s)--t($t)"
+            val shortRoute = (s.headOption, t.headOption)
+              .mapN((s, t) => ShortestRoute(s, t))
+
+            submitQuery(shortRoute, trainActor, badInput)
+
+          }
+        }
+      } ~
       pathPrefix("walksMaxHopsSelectLast") {  // curl "http://localhost:8080/walksMaxHopsSelectLast?src=A&dest=C&limit=5"
         parameters('src, 'dest, 'limit) { (s, t, limit) =>
           get {
@@ -81,16 +96,7 @@ object TrainWebServer {
             val walk = (s.headOption, t.headOption, Try(limit.toInt).toOption)
               .mapN((s, t, lim) => WalksMaxHopsSelectLast(s, t, lim))
 
-            val response: Future[Either[Rejected, Accepted]] =
-              walk match {
-                case Some(w) => (trainActor ? w).mapTo[Either[Rejected, Accepted]]
-                case None => Future.failed(new RuntimeException(badInput))
-              }
-
-            onSuccess(response) {
-              case Right(e) => complete(e)
-              case _ => complete(StatusCodes.NotFound)
-            }
+            submitQuery(walk, trainActor, badInput)
           }
         }
       } ~
@@ -101,36 +107,7 @@ object TrainWebServer {
             val walk = (s.headOption, t.headOption, Try(limit.toInt).toOption)
               .mapN((s, t, lim) => WalksExactSelectLast(s, t, lim))
 
-            val response: Future[Either[Rejected, Accepted]] =
-              walk match {
-                case Some(x) => (trainActor ? x).mapTo[Either[Rejected, Accepted]]
-                case None => Future.failed(new RuntimeException(badInput))
-              }
-
-            onSuccess(response) {
-              case Right(e) => complete(e)
-              case _ => complete(StatusCodes.NotFound)
-            }
-          }
-        }
-      } ~
-      pathPrefix("shortest") {  // curl "http://localhost:8080/shortest?src=A&dest=C"
-        parameters('src, 'dest) { (s, t) =>
-          get {
-            lazy val badInput = s"invalid s($s)--t($t)"
-            val shortRoute = (s.headOption, t.headOption)
-              .mapN((s, t) => ShortestRoute(s, t))
-
-            val response: Future[Either[Rejected, Accepted]] =
-              shortRoute match {
-                case Some(x) => (trainActor ? x).mapTo[Either[Rejected, Accepted]]
-                case None => Future.failed(new RuntimeException(badInput))
-              }
-
-            onSuccess(response) {
-              case Right(e) => complete(e)
-              case _ => complete(StatusCodes.NotFound)
-            }
+            submitQuery(walk, trainActor, badInput)
           }
         }
       } ~
@@ -142,16 +119,8 @@ object TrainWebServer {
             val walks = (s.headOption, t.headOption, Try(limit.toInt).toOption)
               .mapN((s, t, lim) => WalksWithinDistanceSelectLast(s, t, lim))
 
-            val response: Future[Either[Rejected, Accepted]] =
-              walks match {
-                case Some(x) => (trainActor ? x).mapTo[Either[Rejected, Accepted]]
-                case None => Future.failed(new RuntimeException(badInput))
-              }
+            submitQuery(walks, trainActor, badInput)
 
-            onSuccess(response) {
-              case Right(e) => complete(e)
-              case _ => complete(StatusCodes.NotFound)
-            }
           }
         }
       } ~

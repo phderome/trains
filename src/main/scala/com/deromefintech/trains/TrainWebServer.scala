@@ -140,7 +140,7 @@ object TrainWebServer {
           }
         }
 
-      def main(args: Array[String]) {
+      def main(args: Array[String]): Unit = {
 
         val bindingFuture = Http().bindAndHandle(route(webTrainActor), "localhost", 8080)
         println(s"Server online at http://localhost:8080/\nPress RETURN to stop...")

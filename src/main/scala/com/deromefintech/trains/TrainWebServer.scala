@@ -10,12 +10,13 @@ import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.server.Directives._
 import akka.stream.ActorMaterializer
 import akka.util.Timeout
-import com.deromefintech.trains.domain.model._
+import domain.model._
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport._
 import spray.json.DefaultJsonProtocol._
 
 import scala.concurrent.Future
 import scala.io.StdIn
+import scala.util.Try
 
 object TrainWebServer {
 
@@ -55,8 +56,18 @@ object TrainWebServer {
     pathPrefix("distance") {  // curl http://localhost:8080/distance/A/dest/C
       path(Segment / "dest" / Segment) { (s, t) =>
         get {
+          lazy val badInput = s"invalid s($s)--t($t)"
+          val distance = for {
+            ss <- s.headOption
+            tt <- t.headOption
+          } yield Distance(List(ss, tt).mkString)
+
           val response: Future[Either[Accepted, Rejected]] =
-            (trainActor ? Distance(List(s.head, t.head).mkString)).mapTo[Either[Accepted, Rejected]]
+            distance match {
+              case Some(d) => (trainActor ? d).mapTo[Either[Accepted, Rejected]]
+              case None => Future.failed(new RuntimeException(badInput))
+            }
+
           onSuccess(response) {
             case Left(Accepted(result)) =>
               complete(Accepted(result))
@@ -69,8 +80,19 @@ object TrainWebServer {
       pathPrefix("walksMaxHopsSelectLast") {  // curl http://localhost:8080/walksMaxHopsSelectLast/A/dest/C/limit/5
         path(Segment / "dest" / Segment / "limit" / Segment) { (s, t, limit) =>
           get {
+            lazy val badInput = s"invalid s($s)--t($t) limit($limit)"
+            val walk = for {
+              ss <- s.headOption
+              tt <- t.headOption
+              lim <- Try(limit.toInt).toOption
+            } yield WalksMaxHopsSelectLast(ss, tt, lim)
+
             val response: Future[Either[Accepted, Rejected]] =
-              (trainActor ? (WalksMaxHopsSelectLast(s.head, t.head, limit.toInt))).mapTo[Either[Accepted, Rejected]]
+              walk match {
+                case Some(w) => (trainActor ? w).mapTo[Either[Accepted, Rejected]]
+                case None => Future.failed(new RuntimeException(badInput))
+              }
+
             onSuccess(response) {
               case Left(Accepted(result)) =>
                 complete(Accepted(result))

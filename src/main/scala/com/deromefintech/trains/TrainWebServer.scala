@@ -54,7 +54,7 @@ object TrainWebServer {
 
   def route(trainActor: ActorRef): Route =
 
-    pathPrefix("distance") {  // "curl http://localhost:8080/distance?src=A&dest=C"
+    pathPrefix("distance") {  // curl "http://localhost:8080/distance?src=A&dest=C"
       parameters('src, 'dest) { (s, t) =>
         get {
           lazy val badInput = s"invalid s($s)--t($t)"
@@ -84,6 +84,67 @@ object TrainWebServer {
             val response: Future[Either[Rejected, Accepted]] =
               walk match {
                 case Some(w) => (trainActor ? w).mapTo[Either[Rejected, Accepted]]
+                case None => Future.failed(new RuntimeException(badInput))
+              }
+
+            onSuccess(response) {
+              case Right(e) => complete(e)
+              case _ => complete(StatusCodes.NotFound)
+            }
+          }
+        }
+      } ~
+      pathPrefix("walksExactSelectLast") {  // curl "http://localhost:8080/walksExactSelectLast?src=A&dest=C&limit=5"
+        parameters('src, 'dest, 'limit) { (s, t, limit) =>
+          get {
+            lazy val badInput = s"invalid s($s)--t($t) limit($limit)"
+            val walk = (s.headOption, t.headOption, Try(limit.toInt).toOption)
+              .mapN((s, t, lim) => WalksExactSelectLast(s, t, lim))
+
+            val response: Future[Either[Rejected, Accepted]] =
+              walk match {
+                case Some(x) => (trainActor ? x).mapTo[Either[Rejected, Accepted]]
+                case None => Future.failed(new RuntimeException(badInput))
+              }
+
+            onSuccess(response) {
+              case Right(e) => complete(e)
+              case _ => complete(StatusCodes.NotFound)
+            }
+          }
+        }
+      } ~
+      pathPrefix("shortest") {  // curl "http://localhost:8080/shortest?src=A&dest=C"
+        parameters('src, 'dest) { (s, t) =>
+          get {
+            lazy val badInput = s"invalid s($s)--t($t)"
+            val shortRoute = (s.headOption, t.headOption)
+              .mapN((s, t) => ShortestRoute(s, t))
+
+            val response: Future[Either[Rejected, Accepted]] =
+              shortRoute match {
+                case Some(x) => (trainActor ? x).mapTo[Either[Rejected, Accepted]]
+                case None => Future.failed(new RuntimeException(badInput))
+              }
+
+            onSuccess(response) {
+              case Right(e) => complete(e)
+              case _ => complete(StatusCodes.NotFound)
+            }
+          }
+        }
+      } ~
+      pathPrefix("walksWithinDistanceSelectLast") {
+        // curl "http://localhost:8080/walksWithinDistanceSelectLast?src=A&dest=C&limit=5"
+        parameters('src, 'dest, 'limit) { (s, t, limit) =>
+          get {
+            lazy val badInput = s"invalid s($s)--t($t) limit($limit)"
+            val walks = (s.headOption, t.headOption, Try(limit.toInt).toOption)
+              .mapN((s, t, lim) => WalksWithinDistanceSelectLast(s, t, lim))
+
+            val response: Future[Either[Rejected, Accepted]] =
+              walks match {
+                case Some(x) => (trainActor ? x).mapTo[Either[Rejected, Accepted]]
                 case None => Future.failed(new RuntimeException(badInput))
               }
 

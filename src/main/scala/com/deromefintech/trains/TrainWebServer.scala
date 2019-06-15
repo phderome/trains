@@ -67,7 +67,7 @@ object TrainWebServer {
 
   def route(trainActor: ActorRef): Route =
 
-    pathPrefix("distance") {  // curl "http://localhost:8080/distance?src=A&dest=C"
+    path("distance") {  // curl "http://localhost:8080/distance?src=A&dest=B"
       parameters('src, 'dest) { (s, t) =>
         get {
           lazy val badInput = s"invalid s($s)--t($t)"
@@ -77,7 +77,7 @@ object TrainWebServer {
         }
       }
     } ~
-      pathPrefix("shortest") {  // curl "http://localhost:8080/shortest?src=A&dest=C"
+      path("shortest") {  // curl "http://localhost:8080/shortest?src=A&dest=B"
         parameters('src, 'dest) { (s, t) =>
           get {
             lazy val badInput = s"invalid s($s)--t($t)"
@@ -89,7 +89,7 @@ object TrainWebServer {
           }
         }
       } ~
-      pathPrefix("walksMaxHopsSelectLast") {  // curl "http://localhost:8080/walksMaxHopsSelectLast?src=A&dest=C&limit=5"
+      path("walksMaxHopsSelectLast") {  // curl "http://localhost:8080/walksMaxHopsSelectLast?src=A&dest=B&limit=5"
         parameters('src, 'dest, 'limit) { (s, t, limit) =>
           get {
             lazy val badInput = s"invalid s($s)--t($t) limit($limit)"
@@ -100,7 +100,7 @@ object TrainWebServer {
           }
         }
       } ~
-      pathPrefix("walksExactSelectLast") {  // curl "http://localhost:8080/walksExactSelectLast?src=A&dest=C&limit=5"
+      path("walksExactSelectLast") {  // curl "http://localhost:8080/walksExactSelectLast?src=A&dest=B&limit=5"
         parameters('src, 'dest, 'limit) { (s, t, limit) =>
           get {
             lazy val badInput = s"invalid s($s)--t($t) limit($limit)"
@@ -111,8 +111,8 @@ object TrainWebServer {
           }
         }
       } ~
-      pathPrefix("walksWithinDistanceSelectLast") {
-        // curl "http://localhost:8080/walksWithinDistanceSelectLast?src=A&dest=C&limit=5"
+      path("walksWithinDistanceSelectLast") {
+        // curl "http://localhost:8080/walksWithinDistanceSelectLast?src=A&dest=B&limit=5"
         parameters('src, 'dest, 'limit) { (s, t, limit) =>
           get {
             lazy val badInput = s"invalid s($s)--t($t) limit($limit)"

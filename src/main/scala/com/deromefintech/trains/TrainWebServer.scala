@@ -5,32 +5,20 @@ import akka.pattern._
 
 import scala.concurrent.duration._
 import akka.http.scaladsl.Http
+import akka.http.scaladsl.marshalling.{ToResponseMarshallable, ToResponseMarshaller}
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.server.Directives._
 import akka.stream.ActorMaterializer
 import akka.util.Timeout
-import domain.model._
-import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport._
+import domain.model.{Query, _}
 import spray.json.DefaultJsonProtocol._
 
 import scala.concurrent.Future
 import scala.io.StdIn
-import scala.util.Try
 import cats.implicits._
 
-object TrainWebServer {
-
-  // needed to run the route
-  implicit val system = ActorSystem("Trains")
-  val webTrainActor = system.actorOf(Props[TrainActor], TrainActor.WebName)
-  implicit val materializer = ActorMaterializer()
-
-  // needed for the future map/flatmap in the end and Future.apply in fetchItem and saveOrder
-  implicit val executionContext = system.dispatcher
-  implicit val timeout: Timeout = Timeout(5 seconds)
-
-  // formats for unmarshalling and marshalling
+trait DomainMarshallers {
   implicit val rawEdge1Format = jsonFormat2(RawEdge)
   implicit val rawWeightedEdge1Format = jsonFormat2(RawWeightedEdge)
   implicit val networkCreate1Format = jsonFormat2(NetworkCreate)
@@ -51,6 +39,34 @@ object TrainWebServer {
 
   implicit val acceptedQueryFormat = jsonFormat1(Accepted)
   implicit val rejectedResponseFormat = jsonFormat1(Rejected)
+}
+
+object TrainWebServer extends DomainMarshallers {
+  import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport._
+
+  // needed to run the route
+  implicit val system = ActorSystem("Trains")
+  val webTrainActor = system.actorOf(Props[TrainActor], TrainActor.WebName)
+  implicit val materializer = ActorMaterializer()
+
+  // needed for the future map/flatmap in the end and Future.apply in fetchItem and saveOrder
+  implicit val executionContext = system.dispatcher
+  implicit val timeout: Timeout = Timeout(5 seconds)
+
+  def buildEdgeQuery(s: String, t: String, f: (Char, Char) => Query): Option[Query] =
+    (s.headOption, t.headOption)
+      .mapN((s, t) => f(s, t))
+
+  private def badEdgeInput(s: String, t: String): String = s"invalid s($s)--t($t)"
+
+  def buildEdgeWLimitQuery(s: String,
+                           t: String,
+                           limit: Int,
+                           f: (Char, Char, Int) => Query): Option[Query] =
+    (s.headOption, t.headOption)
+      .mapN((s, t) => f(s, t, limit))
+
+  private def badEdgeWLimitInput(s: String, t: String, limit: Int): String = s"invalid s($s)--t($t) limit($limit)"
 
   def submitQuery(q: Option[Query], ref: ActorRef, error: => String): Route = {
     val response: Future[Either[Rejected, Accepted]] =
@@ -65,62 +81,58 @@ object TrainWebServer {
     }
   }
 
+  private def respond[T](done: Future[Either[Rejected, T]])(implicit ev: ToResponseMarshaller[T]): Route =
+    onSuccess(done) {
+      case Right(e) => complete(e)
+      case _ => complete(StatusCodes.NotFound)
+    }
+
   def route(trainActor: ActorRef): Route =
 
     path("distance") {  // curl "http://localhost:8080/distance?src=A&dest=B"
       parameters('src, 'dest) { (s, t) =>
         get {
-          lazy val badInput = s"invalid s($s)--t($t)"
-          val distance = (s.headOption, t.headOption)
-            .mapN((s, t) => Distance(List(s, t).mkString))
-          submitQuery(distance, trainActor, badInput)
+          submitQuery(
+            buildEdgeQuery(s, t, (a, b) => Distance(List(a, b).mkString)),
+            trainActor,
+            badEdgeInput(s, t)
+          )
         }
       }
     } ~
       path("shortest") {  // curl "http://localhost:8080/shortest?src=A&dest=B"
         parameters('src, 'dest) { (s, t) =>
           get {
-            lazy val badInput = s"invalid s($s)--t($t)"
-            val shortRoute = (s.headOption, t.headOption)
-              .mapN((s, t) => ShortestRoute(s, t))
-
-            submitQuery(shortRoute, trainActor, badInput)
-
+            submitQuery(
+              buildEdgeQuery(s, t, ShortestRoute(_, _)),
+              trainActor,
+              badEdgeInput(s, t)
+            )
           }
         }
       } ~
       path("walksMaxHopsSelectLast") {  // curl "http://localhost:8080/walksMaxHopsSelectLast?src=A&dest=B&limit=5"
-        parameters('src, 'dest, 'limit) { (s, t, limit) =>
+        parameters('src, 'dest, 'limit.as[Int]) { (s, t, limit) =>
           get {
-            lazy val badInput = s"invalid s($s)--t($t) limit($limit)"
-            val walk = (s.headOption, t.headOption, Try(limit.toInt).toOption)
-              .mapN((s, t, lim) => WalksMaxHopsSelectLast(s, t, lim))
-
-            submitQuery(walk, trainActor, badInput)
+            val walk = buildEdgeWLimitQuery(s, t, limit, WalksMaxHopsSelectLast)
+            submitQuery(walk, trainActor, badEdgeWLimitInput(s, t, limit))
           }
         }
       } ~
       path("walksExactSelectLast") {  // curl "http://localhost:8080/walksExactSelectLast?src=A&dest=B&limit=5"
-        parameters('src, 'dest, 'limit) { (s, t, limit) =>
+        parameters('src, 'dest, 'limit.as[Int]) { (s, t, limit) =>
           get {
-            lazy val badInput = s"invalid s($s)--t($t) limit($limit)"
-            val walk = (s.headOption, t.headOption, Try(limit.toInt).toOption)
-              .mapN((s, t, lim) => WalksExactSelectLast(s, t, lim))
-
-            submitQuery(walk, trainActor, badInput)
+            val walk = buildEdgeWLimitQuery(s, t, limit, WalksExactSelectLast)
+            submitQuery(walk, trainActor, badEdgeWLimitInput(s, t, limit))
           }
         }
       } ~
       path("walksWithinDistanceSelectLast") {
         // curl "http://localhost:8080/walksWithinDistanceSelectLast?src=A&dest=B&limit=5"
-        parameters('src, 'dest, 'limit) { (s, t, limit) =>
+        parameters('src, 'dest, 'limit.as[Int]) { (s, t, limit) =>
           get {
-            lazy val badInput = s"invalid s($s)--t($t) limit($limit)"
-            val walks = (s.headOption, t.headOption, Try(limit.toInt).toOption)
-              .mapN((s, t, lim) => WalksWithinDistanceSelectLast(s, t, lim))
-
-            submitQuery(walks, trainActor, badInput)
-
+            val walks = buildEdgeWLimitQuery(s, t, limit, WalksWithinDistanceSelectLast)
+            submitQuery(walks, trainActor, badEdgeWLimitInput(s, t, limit))
           }
         }
       } ~
@@ -130,12 +142,9 @@ object TrainWebServer {
             // curl -H "Content-Type: application/json" -X POST -d '{"edge":{"edge":{"s":"A", "t":"B"},"w":2}}'
             // http://localhost:8080/delete-edge
             entity(as[DeleteEdge]) { e =>
-              val edgeDeleted: Future[Either[Rejected, EdgeDeleted]] =
+              respond(
                 (trainActor ? e).mapTo[Either[Rejected, EdgeDeleted]]
-              onSuccess(edgeDeleted) {
-                case Right(e) => complete(e)
-                case _ => complete(StatusCodes.NotFound)
-              }
+              )
             }
           }
         } ~
@@ -145,12 +154,9 @@ object TrainWebServer {
             // curl -H "Content-Type: application/json" -X POST -d '{"edge":{"edge":{"s":"A", "t":"B"},"w":2},"formerWeight":0}'
             // http://localhost:8080/update-edge
             entity(as[UpdateEdge]) { e =>
-              val edgeUpdated: Future[Either[Rejected, EdgeUpdated]] =
+              respond(
                 (trainActor ? e).mapTo[Either[Rejected, EdgeUpdated]]
-              onSuccess(edgeUpdated) {
-                case Right(e) => complete(e)
-                case _ => complete(StatusCodes.NotFound)
-              }
+              )
             }
           }
         } ~
@@ -160,12 +166,9 @@ object TrainWebServer {
             // curl -H "Content-Type: application/json" -X POST -d '{"edgeCount":1,
             // "weightedEdges":[{"edge":{"s":"A", "t":"B"},"w":2}]}' http://localhost:8080/create-network
             entity(as[NetworkCreate]) { e =>
-              val saved: Future[Either[Rejected, NetworkCreated]] =
+              respond(
                 (trainActor ? e).mapTo[Either[Rejected, NetworkCreated]]
-              onSuccess(saved) {
-                case Right(e) => complete(e)
-                case _ => complete(StatusCodes.NotFound)
-              }
+              )
             }
           }
         }

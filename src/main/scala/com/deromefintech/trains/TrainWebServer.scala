@@ -105,25 +105,25 @@ object TrainWebServer extends DomainMarshallers {
           badEdgeInput(s, t)
         )
     } ~
-      edgeDirective("shortest")  { (s, t) =>
-        // curl "http://localhost:8080/shortest?src=A&dest=B"
-        submitQuery(
-          buildEdgeQuery(s, t, ShortestRoute(_, _)),
-          trainActor,
-          badEdgeInput(s, t)
-        )
+    edgeDirective("shortest")  { (s, t) =>
+      // curl "http://localhost:8080/shortest?src=A&dest=B"
+      submitQuery(
+        buildEdgeQuery(s, t, ShortestRoute(_, _)),
+        trainActor,
+        badEdgeInput(s, t)
+      )
     } ~
     edgeWLimitDirective("walksMaxHopsSelectLast")  { (s, t, limit) =>
       // curl "http://localhost:8080/walksMaxHopsSelectLast?src=A&dest=B&limit=5"
       val walk = buildEdgeWLimitQuery(s, t, limit, WalksMaxHopsSelectLast)
       submitQuery(walk, trainActor, badEdgeWLimitInput(s, t, limit))
     } ~
-      edgeWLimitDirective("walksExactSelectLast") { (s, t, limit) =>
+    edgeWLimitDirective("walksExactSelectLast") { (s, t, limit) =>
       // curl "http://localhost:8080/walksExactSelectLast?src=A&dest=B&limit=5"
       val walk = buildEdgeWLimitQuery(s, t, limit, WalksExactSelectLast)
       submitQuery(walk, trainActor, badEdgeWLimitInput(s, t, limit))
     } ~
-      edgeWLimitDirective("walksWithinDistanceSelectLast") { (s, t, limit) =>
+    edgeWLimitDirective("walksWithinDistanceSelectLast") { (s, t, limit) =>
       // curl "http://localhost:8080/walksWithinDistanceSelectLast?src=A&dest=B&limit=5"
       val walks = buildEdgeWLimitQuery(s, t, limit, WalksWithinDistanceSelectLast)
       submitQuery(walks, trainActor, badEdgeWLimitInput(s, t, limit))

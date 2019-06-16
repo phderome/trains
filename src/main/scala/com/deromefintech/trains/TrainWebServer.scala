@@ -88,42 +88,36 @@ object TrainWebServer extends DomainMarshallers {
 
   def route(trainActor: ActorRef): Route =
 
-    (path("distance") & get) {  // curl "http://localhost:8080/distance?src=A&dest=B"
-      parameters('src, 'dest) { (s, t) =>
+    (path("distance") & get & parameters('src, 'dest)) { (s, t) =>
+        // curl "http://localhost:8080/distance?src=A&dest=B"
         submitQuery(
           buildEdgeQuery(s, t, (a, b) => Distance(List(a, b).mkString)),
           trainActor,
           badEdgeInput(s, t)
         )
-      }
     } ~
-      (path("shortest") & get) {  // curl "http://localhost:8080/shortest?src=A&dest=B"
-      parameters('src, 'dest) { (s, t) =>
+      (path("shortest") & get & parameters('src, 'dest)) { (s, t) =>
+        // curl "http://localhost:8080/shortest?src=A&dest=B"
         submitQuery(
           buildEdgeQuery(s, t, ShortestRoute(_, _)),
           trainActor,
           badEdgeInput(s, t)
         )
-      }
     } ~
-    (path("walksMaxHopsSelectLast") & get) {  // curl "http://localhost:8080/walksMaxHopsSelectLast?src=A&dest=B&limit=5"
-      parameters('src, 'dest, 'limit.as[Int]) { (s, t, limit) =>
-          val walk = buildEdgeWLimitQuery(s, t, limit, WalksMaxHopsSelectLast)
-          submitQuery(walk, trainActor, badEdgeWLimitInput(s, t, limit))
-      }
+    (path("walksMaxHopsSelectLast") & get & parameters('src, 'dest, 'limit.as[Int])) { (s, t, limit) =>
+      // curl "http://localhost:8080/walksMaxHopsSelectLast?src=A&dest=B&limit=5"
+      val walk = buildEdgeWLimitQuery(s, t, limit, WalksMaxHopsSelectLast)
+      submitQuery(walk, trainActor, badEdgeWLimitInput(s, t, limit))
     } ~
-    (path("walksExactSelectLast") & get) {  // curl "http://localhost:8080/walksExactSelectLast?src=A&dest=B&limit=5"
-      parameters('src, 'dest, 'limit.as[Int]) { (s, t, limit) =>
-        val walk = buildEdgeWLimitQuery(s, t, limit, WalksExactSelectLast)
-        submitQuery(walk, trainActor, badEdgeWLimitInput(s, t, limit))
-      }
+    (path("walksExactSelectLast") & get & parameters('src, 'dest, 'limit.as[Int])) { (s, t, limit) =>
+      // curl "http://localhost:8080/walksExactSelectLast?src=A&dest=B&limit=5"
+      val walk = buildEdgeWLimitQuery(s, t, limit, WalksExactSelectLast)
+      submitQuery(walk, trainActor, badEdgeWLimitInput(s, t, limit))
     } ~
-    (path("walksWithinDistanceSelectLast") & get) {
+    (path("walksWithinDistanceSelectLast") & get & parameters('src, 'dest, 'limit.as[Int])) { (s, t, limit) =>
       // curl "http://localhost:8080/walksWithinDistanceSelectLast?src=A&dest=B&limit=5"
-      parameters('src, 'dest, 'limit.as[Int]) { (s, t, limit) =>
-        val walks = buildEdgeWLimitQuery(s, t, limit, WalksWithinDistanceSelectLast)
-        submitQuery(walks, trainActor, badEdgeWLimitInput(s, t, limit))
-      }
+      val walks = buildEdgeWLimitQuery(s, t, limit, WalksWithinDistanceSelectLast)
+      submitQuery(walks, trainActor, badEdgeWLimitInput(s, t, limit))
     } ~
     (path("delete-edge") & post) {
       // example

@@ -10,15 +10,16 @@ import akka.util.Timeout
 import scala.io.StdIn
 
 object TrainWebServer {
-  implicit val system = ActorSystem("Trains")
-  val webTrainActor = system.actorOf(Props[TrainActor], TrainActor.WebName)
-  implicit val materializer = ActorMaterializer()
-
-  // needed for the future map/flatmap in the end
-  implicit val executionContext = system.dispatcher
-  implicit val timeout: Timeout = Timeout(5 seconds)
 
   def main(args: Array[String]): Unit = {
+    implicit val system = ActorSystem("Trains")
+    val webTrainActor = system.actorOf(Props[TrainActor], TrainActor.WebName)
+    implicit val mat = ActorMaterializer()
+
+    // needed for the future map/flatmap in the end
+    implicit val executionContext = system.dispatcher
+    implicit val timeout: Timeout = Timeout(5 seconds)
+
     val trainRoutes = new TrainRoutes(webTrainActor)
     val bindingFuture = Http().bindAndHandle(trainRoutes.routes, "localhost", 8080)
     println(s"Server online at http://localhost:8080/\nPress RETURN to stop...")

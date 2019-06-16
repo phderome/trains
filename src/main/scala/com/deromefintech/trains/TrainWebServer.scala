@@ -88,99 +88,83 @@ object TrainWebServer extends DomainMarshallers {
 
   def route(trainActor: ActorRef): Route =
 
-    path("distance") {  // curl "http://localhost:8080/distance?src=A&dest=B"
+    (path("distance") & get) {  // curl "http://localhost:8080/distance?src=A&dest=B"
       parameters('src, 'dest) { (s, t) =>
-        get {
-          submitQuery(
-            buildEdgeQuery(s, t, (a, b) => Distance(List(a, b).mkString)),
-            trainActor,
-            badEdgeInput(s, t)
-          )
-        }
+        submitQuery(
+          buildEdgeQuery(s, t, (a, b) => Distance(List(a, b).mkString)),
+          trainActor,
+          badEdgeInput(s, t)
+        )
       }
     } ~
-      path("shortest") {  // curl "http://localhost:8080/shortest?src=A&dest=B"
-        parameters('src, 'dest) { (s, t) =>
-          get {
-            submitQuery(
-              buildEdgeQuery(s, t, ShortestRoute(_, _)),
-              trainActor,
-              badEdgeInput(s, t)
-            )
-          }
-        }
-      } ~
-      path("walksMaxHopsSelectLast") {  // curl "http://localhost:8080/walksMaxHopsSelectLast?src=A&dest=B&limit=5"
-        parameters('src, 'dest, 'limit.as[Int]) { (s, t, limit) =>
-          get {
-            val walk = buildEdgeWLimitQuery(s, t, limit, WalksMaxHopsSelectLast)
-            submitQuery(walk, trainActor, badEdgeWLimitInput(s, t, limit))
-          }
-        }
-      } ~
-      path("walksExactSelectLast") {  // curl "http://localhost:8080/walksExactSelectLast?src=A&dest=B&limit=5"
-        parameters('src, 'dest, 'limit.as[Int]) { (s, t, limit) =>
-          get {
-            val walk = buildEdgeWLimitQuery(s, t, limit, WalksExactSelectLast)
-            submitQuery(walk, trainActor, badEdgeWLimitInput(s, t, limit))
-          }
-        }
-      } ~
-      path("walksWithinDistanceSelectLast") {
-        // curl "http://localhost:8080/walksWithinDistanceSelectLast?src=A&dest=B&limit=5"
-        parameters('src, 'dest, 'limit.as[Int]) { (s, t, limit) =>
-          get {
-            val walks = buildEdgeWLimitQuery(s, t, limit, WalksWithinDistanceSelectLast)
-            submitQuery(walks, trainActor, badEdgeWLimitInput(s, t, limit))
-          }
-        }
-      } ~
-        post {
-          path("delete-edge") {
-            // example
-            // curl -H "Content-Type: application/json" -X POST -d '{"edge":{"edge":{"s":"A", "t":"B"},"w":2}}'
-            // http://localhost:8080/delete-edge
-            entity(as[DeleteEdge]) { e =>
-              respond(
-                (trainActor ? e).mapTo[Either[Rejected, EdgeDeleted]]
-              )
-            }
-          }
-        } ~
-        post {
-          path("update-edge") {
-            // example
-            // curl -H "Content-Type: application/json" -X POST -d '{"edge":{"edge":{"s":"A", "t":"B"},"w":2},"formerWeight":0}'
-            // http://localhost:8080/update-edge
-            entity(as[UpdateEdge]) { e =>
-              respond(
-                (trainActor ? e).mapTo[Either[Rejected, EdgeUpdated]]
-              )
-            }
-          }
-        } ~
-        post {
-          path("create-network") {
-            // example
-            // curl -H "Content-Type: application/json" -X POST -d '{"edgeCount":1,
-            // "weightedEdges":[{"edge":{"s":"A", "t":"B"},"w":2}]}' http://localhost:8080/create-network
-            entity(as[NetworkCreate]) { e =>
-              respond(
-                (trainActor ? e).mapTo[Either[Rejected, NetworkCreated]]
-              )
-            }
-          }
-        }
-
-      def main(args: Array[String]): Unit = {
-
-        val bindingFuture = Http().bindAndHandle(route(webTrainActor), "localhost", 8080)
-        println(s"Server online at http://localhost:8080/\nPress RETURN to stop...")
-        StdIn.readLine() // let it run until user presses return
-        bindingFuture
-          .flatMap(_.unbind()) // trigger unbinding from the port
-          .onComplete(_ ⇒ system.terminate()) // and shutdown when done
-
+      (path("shortest") & get) {  // curl "http://localhost:8080/shortest?src=A&dest=B"
+      parameters('src, 'dest) { (s, t) =>
+        submitQuery(
+          buildEdgeQuery(s, t, ShortestRoute(_, _)),
+          trainActor,
+          badEdgeInput(s, t)
+        )
       }
+    } ~
+    (path("walksMaxHopsSelectLast") & get) {  // curl "http://localhost:8080/walksMaxHopsSelectLast?src=A&dest=B&limit=5"
+      parameters('src, 'dest, 'limit.as[Int]) { (s, t, limit) =>
+          val walk = buildEdgeWLimitQuery(s, t, limit, WalksMaxHopsSelectLast)
+          submitQuery(walk, trainActor, badEdgeWLimitInput(s, t, limit))
+      }
+    } ~
+    (path("walksExactSelectLast") & get) {  // curl "http://localhost:8080/walksExactSelectLast?src=A&dest=B&limit=5"
+      parameters('src, 'dest, 'limit.as[Int]) { (s, t, limit) =>
+        val walk = buildEdgeWLimitQuery(s, t, limit, WalksExactSelectLast)
+        submitQuery(walk, trainActor, badEdgeWLimitInput(s, t, limit))
+      }
+    } ~
+    (path("walksWithinDistanceSelectLast") & get) {
+      // curl "http://localhost:8080/walksWithinDistanceSelectLast?src=A&dest=B&limit=5"
+      parameters('src, 'dest, 'limit.as[Int]) { (s, t, limit) =>
+        val walks = buildEdgeWLimitQuery(s, t, limit, WalksWithinDistanceSelectLast)
+        submitQuery(walks, trainActor, badEdgeWLimitInput(s, t, limit))
+      }
+    } ~
+    (path("delete-edge") & post) {
+      // example
+      // curl -H "Content-Type: application/json" -X POST -d '{"edge":{"edge":{"s":"A", "t":"B"},"w":2}}'
+      // http://localhost:8080/delete-edge
+      entity(as[DeleteEdge]) { e =>
+        respond(
+          (trainActor ? e).mapTo[Either[Rejected, EdgeDeleted]]
+        )
+      }
+    } ~
+    (path("update-edge") & post) {
+      // example
+      // curl -H "Content-Type: application/json" -X POST -d '{"edge":{"edge":{"s":"A", "t":"B"},"w":2},"formerWeight":0}'
+      // http://localhost:8080/update-edge
+      entity(as[UpdateEdge]) { e =>
+        respond(
+          (trainActor ? e).mapTo[Either[Rejected, EdgeUpdated]]
+        )
+      }
+    } ~
+    (path("create-network") & post) {
+      // example
+      // curl -H "Content-Type: application/json" -X POST -d '{"edgeCount":1,
+      // "weightedEdges":[{"edge":{"s":"A", "t":"B"},"w":2}]}' http://localhost:8080/create-network
+      entity(as[NetworkCreate]) { e =>
+        respond(
+          (trainActor ? e).mapTo[Either[Rejected, NetworkCreated]]
+        )
+      }
+    }
+
+    def main(args: Array[String]): Unit = {
+
+      val bindingFuture = Http().bindAndHandle(route(webTrainActor), "localhost", 8080)
+      println(s"Server online at http://localhost:8080/\nPress RETURN to stop...")
+      StdIn.readLine() // let it run until user presses return
+      bindingFuture
+        .flatMap(_.unbind()) // trigger unbinding from the port
+        .onComplete(_ ⇒ system.terminate()) // and shutdown when done
+
+    }
 
 }

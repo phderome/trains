@@ -6,7 +6,6 @@ import akka.pattern._
 import scala.concurrent.duration._
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.marshalling.ToResponseMarshaller
-import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.server.Directives._
 import akka.stream.ActorMaterializer

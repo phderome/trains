@@ -77,14 +77,14 @@ object TrainWebServer extends DomainMarshallers {
 
     onSuccess(response) {
       case Right(e) => complete(e)
-      case _ => complete(StatusCodes.NotFound)
+      case Left(rej) => failWith(new RuntimeException(rej.msg))
     }
   }
 
-  private def respond[T](done: Future[Either[Rejected, T]])(implicit ev: ToResponseMarshaller[T]): Route =
+  private def respond[T <: Event](done: Future[Either[Rejected, T]])(implicit ev: ToResponseMarshaller[T]): Route =
     onSuccess(done) {
       case Right(e) => complete(e)
-      case _ => complete(StatusCodes.NotFound)
+      case Left(rej) => failWith(new RuntimeException(rej.msg))
     }
 
   def route(trainActor: ActorRef): Route =

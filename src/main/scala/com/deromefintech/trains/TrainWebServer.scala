@@ -5,19 +5,20 @@ import akka.pattern._
 
 import scala.concurrent.duration._
 import akka.http.scaladsl.Http
+import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
 import akka.http.scaladsl.marshalling.ToResponseMarshaller
 import akka.http.scaladsl.server.{Directive, Route}
 import akka.http.scaladsl.server.Directives._
 import akka.stream.ActorMaterializer
 import akka.util.Timeout
 import domain.model.{Query, _}
-import spray.json.DefaultJsonProtocol._
 
 import scala.concurrent.Future
 import scala.io.StdIn
 import cats.implicits._
+import spray.json.DefaultJsonProtocol
 
-trait DomainMarshallers {
+trait JsonProtocol extends SprayJsonSupport with DefaultJsonProtocol {
   implicit val rawEdge1Format = jsonFormat2(RawEdge)
   implicit val rawWeightedEdge1Format = jsonFormat2(RawWeightedEdge)
   implicit val networkCreate1Format = jsonFormat2(NetworkCreate)
@@ -40,9 +41,7 @@ trait DomainMarshallers {
   implicit val rejectedResponseFormat = jsonFormat1(Rejected)
 }
 
-object TrainWebServer extends DomainMarshallers {
-  import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport._
-
+object TrainWebServer extends JsonProtocol {
   // needed to run the route
   implicit val system = ActorSystem("Trains")
   val webTrainActor = system.actorOf(Props[TrainActor], TrainActor.WebName)

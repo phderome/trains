@@ -4,9 +4,9 @@ import akka.actor.{ActorRef, ActorSystem}
 import akka.util.Timeout
 import akka.pattern._
 import akka.http.scaladsl.marshalling.ToResponseMarshaller
+import akka.http.scaladsl.model.HttpMethods
 import akka.http.scaladsl.server.{Directive, Route}
 import akka.http.scaladsl.server.Directives._
-
 import akka.stream.Materializer
 import com.deromefintech.trains.domain.model._
 import cats.implicits._
@@ -90,33 +90,41 @@ class TrainRoutes(trainActor: ActorRef)(implicit val ec:ExecutionContext, timeou
         val walks = buildEdgeWLimitQuery(s, t, limit, WalksWithinDistanceSelectLast)
         submitQuery(walks, trainActor, badEdgeWLimitInput(s, t, limit))
       } ~
-      postDirective("delete-edge") {
+      (put | post) {  // example to show that we can convert PUT requests to POST requests if we need to make them equivalent.
+        mapRequest(_.copy(method = HttpMethods.POST)) {
+          postDirective("update-edge")  {
+            // example
+            // curl -H "Content-Type: application/json" -X POST -d '{"edge":{"edge":{"s":"A", "t":"B"},"w":2},"formerWeight":0}'
+            // http://localhost:8080/update-edge
+            entity(as[UpdateEdge]) { e =>
+              respond(
+                (trainActor ? e).mapTo[Either[Rejected, EdgeUpdated]]
+              )
+            }
+          } ~
+            postDirective("create-network") {
+              // example taken from TrainApp, allowing same queries to be made
+              // AB5, BC4, CD8, DC8, DE6, AD5, CE2, EB3, AE7
+              // curl -H "Content-Type: application/json" -X POST -d '{"edgeCount":9,
+              // "weightedEdges":[{"edge":{"s":"A", "t":"B"},"w":5},{"edge":{"s":"B", "t":"C"},"w":4},{"edge":{"s":"C", "t":"D"},"w":8},
+              // {"edge":{"s":"D", "t":"C"},"w":8},{"edge":{"s":"D", "t":"E"},"w":6},{"edge":{"s":"A", "t":"D"},"w":5},
+              // {"edge":{"s":"C", "t":"E"},"w":2},{"edge":{"s":"E", "t":"B"},"w":3},{"edge":{"s":"A", "t":"E"},"w":7}
+              // ]}' http://localhost:8080/create-network
+              entity(as[NetworkCreate]) { e =>
+                respond(
+                  (trainActor ? e).mapTo[Either[Rejected, NetworkCreated]]
+                )
+              }
+            }
+        }
+      } ~
+      (path("delete-edge") & delete) {
         // example
-        // curl -H "Content-Type: application/json" -X POST -d '{"edge":{"edge":{"s":"A", "t":"B"},"w":2}}'
+        // curl -H "Content-Type: application/json" -X DELETE -d '{"edge":{"edge":{"s":"A", "t":"B"},"w":2}}'
         // http://localhost:8080/delete-edge
         entity(as[DeleteEdge]) { e =>
           respond(
             (trainActor ? e).mapTo[Either[Rejected, EdgeDeleted]]
-          )
-        }
-      } ~
-      postDirective("update-edge")  {
-        // example
-        // curl -H "Content-Type: application/json" -X POST -d '{"edge":{"edge":{"s":"A", "t":"B"},"w":2},"formerWeight":0}'
-        // http://localhost:8080/update-edge
-        entity(as[UpdateEdge]) { e =>
-          respond(
-            (trainActor ? e).mapTo[Either[Rejected, EdgeUpdated]]
-          )
-        }
-      } ~
-      postDirective("create-network") {
-        // example
-        // curl -H "Content-Type: application/json" -X POST -d '{"edgeCount":1,
-        // "weightedEdges":[{"edge":{"s":"A", "t":"B"},"w":2}]}' http://localhost:8080/create-network
-        entity(as[NetworkCreate]) { e =>
-          respond(
-            (trainActor ? e).mapTo[Either[Rejected, NetworkCreated]]
           )
         }
       }

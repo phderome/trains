@@ -5,6 +5,7 @@ import com.deromefintech.trains.domain.model._
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
+import scala.io.StdIn
 
 object TrainApp extends App {
 
@@ -52,5 +53,6 @@ object TrainApp extends App {
     TrainActor.getSampleQueries.foreach(q => trainActor ! q)
   }
   Thread.sleep(1000) // so that we avoid dead letters and can see results back in Akka logging
-  Await.ready(system.terminate(), 15.seconds)
+  system.stop(trainActor)
+  system.terminate()
 }

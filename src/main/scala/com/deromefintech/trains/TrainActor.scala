@@ -87,9 +87,8 @@ class TrainActor() extends PersistentActor with ActorLogging {
             log.warning(rejected.toString)
           case Some(newService) =>
             val deleted = EdgeDeleted(e)
-            persist(deleted) { e =>
+            persist(deleted) { _ =>
               trainGraph = Some(TrainGraph(newService))
-              context.system.eventStream.publish(e)
               val accepted: Either[Rejected, EdgeDeleted] = Right(deleted)
               sender() ! accepted
               val msg = s"train network deleted edge $deleted"
@@ -111,9 +110,8 @@ class TrainActor() extends PersistentActor with ActorLogging {
               log.warning(rejected.toString)
             case Some(newService) =>
               val updated = EdgeUpdated(weightedEdge, old)
-              persist(updated) { e =>
+              persist(updated) { _ =>
                 trainGraph = Some(TrainGraph(newService))
-                context.system.eventStream.publish(e)
                 val accepted: Either[Rejected, EdgeUpdated] = Right(updated)
                 sender() ! accepted
                 val msg = s"train network updated edge $updated"
@@ -173,9 +171,8 @@ class TrainActor() extends PersistentActor with ActorLogging {
       case Some(service) =>
         val event = NetworkCreated(edgeCount, weightedEdges)
         val creating = trainGraph.isEmpty
-        persist(event) { e =>
+        persist(event) { _ =>
           trainGraph = Some(TrainGraph(service))
-          context.system.eventStream.publish(e)
           val accepted: Either[Rejected, NetworkCreated] = Right(event)
           sender() ! accepted
           val msg = s"created train network $event"

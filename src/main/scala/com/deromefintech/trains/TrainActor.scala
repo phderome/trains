@@ -19,7 +19,7 @@ class TrainActor() extends PersistentActor with ActorLogging {
   override def receiveRecover: Receive = {
     case NetworkCreated(edgeCount, weightedEdges) ⇒
       TrainService.createRoutes(edgeCount, weightedEdges).map(TrainService(_)).foreach { service =>
-        trainGraph =Some(TrainGraph(service))
+        trainGraph = Some(TrainGraph(service))
         context.become(created)
       }
 
@@ -81,10 +81,7 @@ class TrainActor() extends PersistentActor with ActorLogging {
         service.deleteEdge(e) match {
           case None =>
             val cmd = DeleteEdge(e)
-            // input is invalid as edge with said weight does not exist
-            val rejected: Either[Rejected, EdgeDeleted] = Left(Rejected(s"invalid command $cmd"))
-            sender() ! rejected
-            log.warning(rejected.toString)
+            rejectOnline(sender(), cmd)
           case Some(newService) =>
             val deleted = EdgeDeleted(e)
             persist(deleted) { _ =>
@@ -104,10 +101,7 @@ class TrainActor() extends PersistentActor with ActorLogging {
           s.updateEdge(weightedEdge, old) match {
             case None =>
               val cmd = UpdateEdge(weightedEdge, old)
-              // input is invalid as edge with said weight does not exist
-              val rejected: Either[Rejected, EdgeUpdated] = Left(Rejected(s"invalid command $cmd"))
-              sender() ! rejected
-              log.warning(rejected.toString)
+              rejectOnline(sender(), cmd)
             case Some(newService) =>
               val updated = EdgeUpdated(weightedEdge, old)
               persist(updated) { _ =>
